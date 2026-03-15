@@ -1,0 +1,127 @@
+{
+  "projectType": "saas",
+  "projectName": "Academia Gema",
+  "projectDescription": "A full-stack volleyball academy management platform with role-based dashboards for administrators, students, and coordinators — covering enrollment, scheduling, payments, attendance, and more.",
+  "theme": "almond",
+  "primaryColor": "#1e3a8a",
+  "lightColor": "#f97316",
+  "darkColor": "#0f172a",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Overview",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": ["introduction", "quickstart", "installation"]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": ["concepts/roles", "concepts/schedules", "concepts/enrollment", "concepts/payments"]
+          }
+        ]
+      },
+      {
+        "tab": "Student Guide",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": ["student/overview", "student/registration", "student/enrollment"]
+          },
+          {
+            "group": "Managing Your Account",
+            "pages": ["student/payments", "student/attendance", "student/injuries", "student/recoveries", "student/news"]
+          }
+        ]
+      },
+      {
+        "tab": "Admin Guide",
+        "groups": [
+          {
+            "group": "Dashboard",
+            "pages": ["admin/overview", "admin/dashboard"]
+          },
+          {
+            "group": "Academic Management",
+            "pages": ["admin/students", "admin/teachers", "admin/schedules", "admin/levels", "admin/locations"]
+          },
+          {
+            "group": "Financial Management",
+            "pages": ["admin/payments", "admin/payment-validation", "admin/catalog"]
+          },
+          {
+            "group": "Operations",
+            "pages": ["admin/injuries", "admin/guest-passes", "admin/reschedules", "admin/publications", "admin/benefits", "admin/settings"]
+          }
+        ]
+      },
+      {
+        "tab": "Coordinator Guide",
+        "groups": [
+          {
+            "group": "Coordinator Features",
+            "pages": ["coordinator/overview", "coordinator/attendance", "coordinator/cutday", "coordinator/profile"]
+          }
+        ]
+      },
+      {
+        "tab": "Technical Reference",
+        "groups": [
+          {
+            "group": "API Reference",
+            "pages": ["api/overview", "api/auth", "api/schedules", "api/enrollments", "api/payments", "api/attendance", "api/users"]
+          },
+          {
+            "group": "Database",
+            "pages": ["database/schema", "database/roles-and-users", "database/academic-structure", "database/financials"]
+          },
+          {
+            "group": "Deployment",
+            "pages": ["deployment/overview", "deployment/frontend", "deployment/environment-variables"]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Role-based access control for Admins, Students, and Coordinators",
+    "Weekly schedule browser with day and level filtering",
+    "Student enrollment and class registration management",
+    "Payment reporting, validation, and accounts-receivable tracking",
+    "Attendance recording with present/absent/late/justified statuses",
+    "Injury and recovery tracking per student",
+    "Multi-location (sede) and multi-court (cancha) support",
+    "Training level catalog with monthly pricing",
+    "Class rescheduling and makeup session management",
+    "Admin publications and news feed for students",
+    "Guest pass management",
+    "Benefit and discount system",
+    "Export reports to Excel (xlsx)"
+  ],
+  "publicApiSurface": [
+    "POST /auth/login",
+    "POST /auth/logout",
+    "POST /auth/forgot-password",
+    "POST /auth/reset-password",
+    "GET /horarios",
+    "GET /horarios/:id",
+    "GET /niveles",
+    "GET /sedes",
+    "GET /catalogo/vigentes",
+    "GET /usuarios/role/alumno",
+    "GET /usuarios/role/coordinador",
+    "POST /usuarios/register",
+    "GET /inscripciones",
+    "GET /asistencias/alumno/:id",
+    "GET /pagos/alumno/:id",
+    "POST /pagos/reportar",
+    "POST /pagos/validar",
+    "GET /lesiones/alumno/:id",
+    "GET /recuperaciones/alumno/:id",
+    "GET /publicaciones",
+    "GET /clases/horarios-con-asistencia",
+    "POST /clases/reprogramar-masivo",
+    "GET /feriados",
+    "GET /coordinadores"
+  ]
+}
