@@ -1,0 +1,142 @@
+---
+title: "Roles and access control"
+description: "How Academia Gema's three roles work, how they are enforced, and what each role can and cannot do."
+---
+
+Academia Gema uses a role-based access control system with three roles. Every user has exactly one role, stored in the database and surfaced as a browser cookie after login.
+
+## The three roles
+
+| Role | Internal name | Dashboard route |
+|------|--------------|----------------|
+| Administrator | `Administrador` | `/dashboard/admin` |
+| Student | `Alumno` | `/dashboard/student` |
+| Coordinator | `Coordinador` | `/dashboard/teacher` |
+
+<Info>
+  Role names are case-sensitive and match the values stored in the `roles` table (`ADMIN`, `PROFESOR`, `ALUMNO`) mapped to the display names `Administrador`, `Coordinador`, and `Alumno` in the frontend.
+</Info>
+
+## Role assignment
+
+Roles are assigned at the database level in the `roles` table and linked to each user through the `usuarios.rol_id` foreign key.
+
+```sql
+CREATE TABLE roles (
+    id SERIAL PRIMARY KEY,
+    nombre VARCHAR(50) UNIQUE NOT NULL -- e.g. 'ADMIN', 'PROFESOR', 'ALUMNO'
+);
+
+CREATE TABLE usuarios (
+    id SERIAL PRIMARY KEY,
+    rol_id INT NOT NULL REFERENCES roles(id),
+    nombres VARCHAR(100) NOT NULL,
+    apellidos VARCHAR(100) NOT NULL,
+    email VARCHAR(150) UNIQUE NOT NULL,
+    ...
+);
+```
+
+When a user logs in via `POST /auth/login`, the backend returns the user object including their role. The frontend's `AuthContext` reads four cookies to restore session state after a page reload:
+
+| Cookie | Value |
+|--------|-------|
+| `user_role` | The role name, e.g. `Administrador` |
+| `user_name` | The user's first name |
+| `user_lastname` | The user's last name |
+| `user_id` | The numeric user ID |
+
+All cookies are set with a 1-day expiry and `sameSite: 'strict'`.
+
+## ProtectedRoute component
+
+Route protection is handled by `src/components/ProtectedRoute.jsx`. It wraps a group of routes and accepts an `allowedRoles` array:
+
+```jsx
+// src/components/ProtectedRoute.jsx
+const ProtectedRoute = ({ allowedRoles }) => {
+    const { user, loading } = useAuth();
+
+    if (loading) return <LoadingSpinner />;
+
+    const isAuthenticated = !!user;
+    if (!isAuthenticated) {
+        return <Navigate to="/login" replace />;
+    }
+
+    const currentRole = user?.rol || user?.user?.rol || Cookies.get('user_role');
+
+    if (allowedRoles && (!currentRole || !allowedRoles.includes(currentRole))) {
+        return <Navigate to="/forbidden" replace />;
+    }
+
+    return <Outlet />;
+};
+```
+
+The three role groups in `App.jsx` map to these `allowedRoles` arrays:
+
+| Role group | `allowedRoles` values |
+|------------|----------------------|
+| Student routes | `['Alumno', 'student', 'alumno']` |
+| Coordinator routes | `['Coordinador', 'teacher', 'profesor']` |
+| Admin routes | `['Administrador', 'admin', 'administrador']` |
+
+If a user is not authenticated, they are redirected to `/login`. If they are authenticated but their role is not in `allowedRoles`, they are redirected to `/forbidden`.
+
+## Dashboard routing
+
+Each role has a dedicated layout and route namespace:
+
+```
+/dashboard/admin        → DashboardLayout  (full sidebar, admin tools)
+/dashboard/student      → StudentLayout    (mobile + desktop sidebar)
+/dashboard/teacher      → TeacherLayout    (minimal sidebar)
+```
+
+Visiting `/dashboard` without a sub-path redirects to `/dashboard/student` by default.
+
+## Permissions matrix
+
+| Feature | Administrador | Alumno | Coordinador |
+|---------|:-------------:|:------:|:-----------:|
+| View admin overview dashboard | ✓ | — | — |
+| Manage locations and courts | ✓ | — | — |
+| Manage training levels | ✓ | — | — |
+| Create and edit class schedules | ✓ | — | — |
+| Register and manage students | ✓ | — | — |
+| Register and manage teachers | ✓ | — | — |
+| Validate payments | ✓ | — | — |
+| Manage catalog and plans | ✓ | — | — |
+| Manage benefits and discounts | ✓ | — | — |
+| Manage publications | ✓ | — | — |
+| View and manage injuries (all) | ✓ | — | — |
+| Bulk reschedule / holiday management | ✓ | — | — |
+| Platform settings | ✓ | — | — |
+| Browse class schedule (public) | ✓ | ✓ | ✓ |
+| Enroll in a class slot | — | ✓ | — |
+| View own enrollments | — | ✓ | — |
+| Report a payment | — | ✓ | — |
+| View own payment history | — | ✓ | — |
+| View own attendance | — | ✓ | — |
+| Log own injury | — | ✓ | — |
+| View own recovery sessions | — | ✓ | — |
+| Read publications / news | — | ✓ | — |
+| Take class attendance | — | — | ✓ |
+| View cut-day billing summary | — | — | ✓ |
+| Edit own profile | — | ✓ | ✓ |
+
+## Session management
+
+Authentication uses JWTs delivered via HTTP-only cookies managed by the backend, with a refresh token flow:
+
+- **Login** — `POST /auth/login` authenticates credentials and issues tokens.
+- **Token refresh** — `POST /auth/refresh` issues a new access token using the refresh token.
+- **Logout** — `POST /auth/logout` invalidates the session on the backend. The frontend clears the React context state and redirects to `/login`.
+- **Password reset** — `POST /auth/forgot-password` initiates an email-based reset; `POST /auth/reset-password` completes it.
+- **Profile update** — `PATCH /auth/profile` updates name or other profile fields and re-sets the `user_name` and `user_lastname` cookies.
+- **Password change** — `POST /auth/change-password` for authenticated users updating their own password.
+
+<Warning>
+  Cookies expire after 1 day. Users will be redirected to `/login` when their session expires and they attempt to access a protected route.
+</Warning>

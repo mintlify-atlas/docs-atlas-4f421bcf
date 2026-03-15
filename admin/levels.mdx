@@ -1,0 +1,114 @@
+---
+title: "Training Level Management"
+description: "Create and manage niveles_entrenamiento — the training levels that categorize classes and drive enrollment pricing."
+---
+
+Training levels (`niveles_entrenamiento`) are the foundational classification for classes in Academia Gema. Every schedule record must be assigned a level, and the level's `precio_mensual` feeds into billing calculations.
+
+## What a level contains
+
+The `niveles_entrenamiento` table stores:
+
+| Field | Type | Description |
+|---|---|---|
+| `id` | integer | Auto-incremented primary key |
+| `nombre` | string (50) | Display name — e.g., `Principiante`, `Intermedio`, `Avanzado` |
+| `precio_mensual` | decimal(10,2) | Monthly price for this level |
+
+---
+
+## Viewing levels
+
+The **Levels** page (`/dashboard/admin/levels`) loads all levels from:
+
+```http
+GET /niveles
+```
+
+Results appear as cards in a 3-column grid. Use the search bar to filter by `nombre`.
+
+---
+
+## Creating a new level
+
+<Steps>
+  <Step title="Click 'Nuevo Nivel'">
+    From the levels list, click the **Nuevo Nivel** button.
+  </Step>
+  <Step title="Enter the level name">
+    Type the display name. Examples: `Sub-12 Iniciación`, `Intermedio`, `Alto Rendimiento`.
+  </Step>
+  <Step title="Set the monthly price">
+    Enter the `precio_mensual` in Peruvian Soles (S/). This value is used by the billing engine when generating `cuentas_por_cobrar` records.
+  </Step>
+  <Step title="Save">
+    The form submits to:
+
+    ```http
+    POST /niveles
+    Content-Type: application/json
+
+    {
+      "nombre": "Sub-12 Iniciación",
+      "precio_mensual": 150.00
+    }
+    ```
+  </Step>
+</Steps>
+
+---
+
+## Editing a level
+
+1. Click the pencil icon on a level card.
+2. Update the `nombre` and/or `precio_mensual`.
+3. The update calls:
+
+```http
+PUT /niveles/:id
+Content-Type: application/json
+
+{
+  "nombre": "Intermedio Plus",
+  "precio_mensual": 180.00
+}
+```
+
+<Warning>
+  Changing `precio_mensual` on an active level affects the price charged to new enrollments in classes assigned to that level. It does not retroactively change existing `cuentas_por_cobrar` records that have already been generated.
+</Warning>
+
+---
+
+## Deleting a level
+
+Click the trash icon on a level card and confirm the deletion. The API calls:
+
+```http
+DELETE /niveles/:id
+```
+
+<Warning>
+  You cannot delete a level that is currently assigned to one or more active schedules. Remove or reassign those schedules first.
+</Warning>
+
+---
+
+## How levels appear on the public schedule browser
+
+When a prospective student browses classes, the schedule browser filters available time slots by level. The level `nombre` is displayed prominently on each schedule card (e.g., `INTERMEDIO` shown below the time range).
+
+Students selecting a class are implicitly selecting its level, which determines their monthly billing amount.
+
+---
+
+## Relationship to the plan catalog
+
+The **Catalog** module (`/dashboard/admin/catalog`) manages `catalogo` entries that define plans by `cantidad_clases_semanal` and `precio_base`. Levels and catalog entries are separate concepts:
+
+| Concept | Table | Drives |
+|---|---|---|
+| Training level | `niveles_entrenamiento` | Class assignment, billing price |
+| Catalog plan | `catalogo` | Public pricing page, plan selection |
+
+A student can be enrolled in a level-based schedule independently of which catalog plan they are subscribed to.

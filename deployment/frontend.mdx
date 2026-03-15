@@ -1,0 +1,177 @@
+---
+title: Frontend deployment
+description: Step-by-step instructions for deploying the Academia Gema React frontend to Netlify, Railway, or a manual VPS.
+---
+
+The frontend is a Vite-built React SPA. The build output is a static `dist/` folder that can be served from any static file host or via the included Vite preview server.
+
+## Netlify
+
+The repository includes a `netlify.toml` that configures the build automatically.
+
+### netlify.toml
+
+```toml
+[build]
+  base = ""
+  publish = "dist"
+  command = "npm run build"
+```
+
+<Steps>
+  <Step title="Connect your repository">
+    Log in to [Netlify](https://app.netlify.com), click **Add new site**, and choose **Import an existing project**. Authorize access to your Git provider and select the repository.
+  </Step>
+  <Step title="Configure build settings">
+    Netlify reads `netlify.toml` and pre-fills these values, but verify them in the UI:
+
+    | Setting | Value |
+    |---|---|
+    | Build command | `npm run build` |
+    | Publish directory | `dist` |
+    | Base directory | (leave empty) |
+  </Step>
+  <Step title="Set environment variables">
+    Go to **Site configuration → Environment variables** and add:
+
+    | Key | Value |
+    |---|---|
+    | `VITE_API_URL` | `https://api.yourdomain.com` |
+
+    Vite embeds environment variables at build time. The variable must be set **before** you trigger a build.
+  </Step>
+  <Step title="Deploy">
+    Click **Deploy site**. Netlify installs dependencies with `npm install` (Node.js ≥ 22.12.0 required), runs `npm run build`, and publishes the `dist/` folder.
+  </Step>
+  <Step title="Configure SPA redirects">
+    For React Router to handle client-side routes correctly, add a `_redirects` file to your `public/` folder:
+
+    ```
+    /*    /index.html    200
+    ```
+
+    This ensures all routes return `index.html` instead of a 404.
+  </Step>
+</Steps>
+
+---
+
+## Railway
+
+The repository includes a `railway.json` that configures the build and start command.
+
+### railway.json
+
+```json
+{
+  "build": {
+    "builder": "NIXPACKS"
+  },
+  "deploy": {
+    "startCommand": "npm run start",
+    "restartPolicyType": "ON_FAILURE"
+  }
+}
+```
+
+The `start` script in `package.json` runs:
+
+```bash
+vite preview --host 0.0.0.0 --port ${PORT:-4173}
+```
+
+`vite.config.js` also configures the preview server:
+
+```javascript
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+
+export default defineConfig({
+  plugins: [react()],
+  preview: {
+    allowedHosts: true,
+    port: process.env.PORT || 8080,
+    host: '0.0.0.0'
+  },
+  server: {
+    allowedHosts: true
+  }
+})
+```
+
+<Steps>
+  <Step title="Create a new Railway project">
+    Log in to [Railway](https://railway.app), click **New Project**, and choose **Deploy from GitHub repo**. Select your repository.
+  </Step>
+  <Step title="Set environment variables">
+    In the Railway service settings under **Variables**, add:
+
+    | Key | Value |
+    |---|---|
+    | `VITE_API_URL` | `https://api.yourdomain.com` |
+
+    Railway also provides a `PORT` variable automatically. The preview server reads it via `${PORT:-4173}`.
+  </Step>
+  <Step title="Deploy">
+    Railway detects `railway.json`, builds with Nixpacks (which installs Node.js ≥ 22.12.0 and runs `npm install && npm run build`), then starts the service with `npm run start`.
+  </Step>
+</Steps>
+
+<Note>
+  The Vite preview server is not designed for production traffic — it does not support HTTP/2, compression, or advanced caching headers. Use Netlify for production and Railway for staging or preview environments.
+</Note>
+
+---
+
+## Manual / VPS
+
+You can build the frontend locally or in CI and serve the `dist/` folder with any static file server.
+
+<Steps>
+  <Step title="Install dependencies">
+    ```bash
+    npm install
+    ```
+  </Step>
+  <Step title="Set the environment variable">
+    Create a `.env` file or export the variable in your shell:
+
+    ```bash
+    export VITE_API_URL=https://api.yourdomain.com
+    ```
+  </Step>
+  <Step title="Build">
+    ```bash
+    npm run build
+    ```
+
+    Output is placed in `dist/`.
+  </Step>
+  <Step title="Serve the output">
+    Serve `dist/` with any static file server. Examples:
+
+    <CodeGroup>
+
+    ```bash nginx
+    # Example nginx server block
+    server {
+        listen 80;
+        server_name yourdomain.com;
+        root /var/www/gema/dist;
+        index index.html;
+
+        location / {
+            try_files $uri $uri/ /index.html;
+        }
+    }
+    ```
+
+    ```bash npx serve
+    npx serve dist --single
+    ```
+
+    </CodeGroup>
+
+    The `try_files` / `--single` flag is required for React Router's client-side routing.
+  </Step>
+</Steps>

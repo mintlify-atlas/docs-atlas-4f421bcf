@@ -1,0 +1,199 @@
+---
+title: Enrollments API
+description: Endpoints for enrolling students in class schedules, managing enrollment status, and handling recovery sessions.
+---
+
+Enrollment endpoints manage the `inscripciones` table (which student is enrolled in which schedule) and the `recuperaciones` subsystem (make-up sessions for missed classes).
+
+---
+
+## GET /inscripciones
+
+Returns a list of enrollments. The results are filtered by the caller's role: admins see all enrollments, coordinators see enrollments for their venue, and students see only their own.
+
+**Authentication:** Required.
+
+### Response
+
+<ResponseField name="success" type="boolean" required />
+
+<ResponseField name="data" type="object[]">
+  <Expandable title="enrollment object">
+    <ResponseField name="id" type="number">Enrollment ID.</ResponseField>
+    <ResponseField name="alumno_id" type="number">Student user ID.</ResponseField>
+    <ResponseField name="horario_id" type="number">Schedule ID.</ResponseField>
+    <ResponseField name="fecha_inscripcion" type="string">Enrollment date in `YYYY-MM-DD` format.</ResponseField>
+    <ResponseField name="estado" type="string">`ACTIVO`, `SUSPENDIDO`, or `RETIRADO`.</ResponseField>
+    <ResponseField name="actualizado_en" type="string">ISO 8601 timestamp of the last status change.</ResponseField>
+  </Expandable>
+</ResponseField>
+
+---
+
+## POST /inscripciones
+
+Enrolls a student in a class schedule.
+
+**Authentication:** Required (admin or coordinator).
+
+### Request body
+
+<ParamField body="alumno_id" type="number" required>
+  The student's user ID (`alumnos.usuario_id`).
+</ParamField>
+
+<ParamField body="horario_id" type="number" required>
+  The schedule ID to enroll the student in.
+</ParamField>
+
+<Warning>
+  The combination of `alumno_id` and `horario_id` must be unique. The database enforces this with the `unica_inscripcion_alumno` constraint. Attempting to duplicate an enrollment returns an error.
+</Warning>
+
+### Response
+
+<ResponseField name="success" type="boolean" required />
+<ResponseField name="data" type="object">
+  The newly created enrollment object.
+</ResponseField>
+
+---
+
+## PUT /inscripciones/:id
+
+Updates an enrollment's status.
+
+**Authentication:** Required (admin or coordinator).
+
+### Path parameters
+
+<ParamField path="id" type="number" required>
+  The enrollment ID to update.
+</ParamField>
+
+### Request body
+
+<ParamField body="estado" type="string" required>
+  New status. Must be one of: `ACTIVO`, `SUSPENDIDO`, `RETIRADO`.
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean" required />
+<ResponseField name="data" type="object">
+  The updated enrollment object.
+</ResponseField>
+
+---
+
+## DELETE /inscripciones/:id
+
+Removes an enrollment record.
+
+**Authentication:** Required (admin).
+
+### Path parameters
+
+<ParamField path="id" type="number" required>
+  The enrollment ID to delete.
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean" required />
+<ResponseField name="message" type="string">
+  Confirmation message.
+</ResponseField>
+
+---
+
+## GET /recuperaciones
+
+Returns recovery session tickets. Coordinators see pending tickets for their venue.
+
+**Authentication:** Required.
+
+### Response
+
+<ResponseField name="success" type="boolean" required />
+<ResponseField name="data" type="object[]">
+  Array of recovery session objects.
+</ResponseField>
+
+---
+
+## GET /recuperaciones/historial
+
+Returns the history of all recovery sessions for the authenticated coordinator or admin.
+
+**Authentication:** Required.
+
+### Response
+
+<ResponseField name="success" type="boolean" required />
+<ResponseField name="data" type="object[]">
+  Array of historical recovery records.
+</ResponseField>
+
+---
+
+## GET /recuperaciones/alumno/:id
+
+Returns the recovery session history for a specific student.
+
+**Authentication:** Required.
+
+### Path parameters
+
+<ParamField path="id" type="number" required>
+  The student's user ID.
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean" required />
+<ResponseField name="data" type="object[]">
+  Array of recovery records belonging to the student.
+</ResponseField>
+
+---
+
+## POST /recuperaciones
+
+Creates a recovery session request for a student. Students submit this when they miss a class and are eligible for a make-up.
+
+**Authentication:** Required.
+
+### Request body
+
+The exact body fields accepted depend on the backend implementation. Based on the `recuperacionService.agendar` call the following fields are used when scheduling a recovery:
+
+<ParamField body="alumnoId" type="number" required>
+  The student's user ID.
+</ParamField>
+
+<ParamField body="recuperacionId" type="number" required>
+  The recovery ticket ID being redeemed.
+</ParamField>
+
+<ParamField body="horarioDestinoId" type="number" required>
+  The schedule ID for the make-up class.
+</ParamField>
+
+<ParamField body="fechaProgramada" type="string" required>
+  The date for the make-up session in `YYYY-MM-DD` format.
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean" required />
+<ResponseField name="data" type="object">
+  The created or updated recovery record.
+</ResponseField>
+
+<Note>
+  Additional recovery sub-routes available from the service layer:
+  - `GET /recuperaciones/pendientes` — pending tickets for the coordinator.
+  - `POST /recuperaciones/agendar-recuperacion` — schedule a recovery session.
+  - `POST /recuperaciones/cancelar-recuperacion/:id` — cancel a recovery session.
+</Note>

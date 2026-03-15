@@ -1,0 +1,115 @@
+---
+title: "Injury Management"
+description: "Review and evaluate pending injury reports submitted by students. Understand the injury triage workflow and how evaluations link to recovery sessions."
+---
+
+When a student sustains an injury, they submit a report through the app. The **Injury Management** panel (`/dashboard/admin/injuries`) shows all pending reports so the admin staff can evaluate each case and authorize recovery sessions.
+
+## Viewing pending injury reports
+
+The page loads using the `lesionService.obtenerPendientes()` function, which calls:
+
+```http
+GET /lesiones/pendientes
+```
+
+This returns only reports with a `PENDIENTE` status. Click **Sincronizar** (refresh button) at any time to reload the list.
+
+---
+
+## Injury report fields
+
+Each injury report in the table contains:
+
+| Field | Source | Description |
+|---|---|---|
+| Student name | `alumnos.usuarios.nombres` + `apellidos` | Full name of the reporting student |
+| Document number | `alumnos.usuarios.numero_documento` | Student ID |
+| `descripcion_lesion` | Injury report | Student's description of the injury |
+| `url_evidencia_medica` | Cloudinary URL | Medical evidence image (X-ray, doctor's note, etc.) |
+| `fecha_solicitud` | Timestamp | When the student submitted the report |
+
+---
+
+## Viewing medical evidence
+
+Click the **eye icon** (desktop) or the **Evidencia** button (mobile) to open a full-screen image viewer showing the uploaded `url_evidencia_medica`. The viewer displays the image in a dark-overlay modal — click outside or the **X** button to close.
+
+---
+
+## Evaluating an injury report
+
+<Steps>
+  <Step title="Click 'Evaluar'">
+    Click the orange **Evaluar** button on a report row. This opens the `InjuryEvaluationModal`.
+  </Step>
+  <Step title="Review the report details">
+    The modal displays the student's full injury description and any attached evidence.
+  </Step>
+  <Step title="Set the evaluation">
+    Provide an evaluation with:
+
+    | Field | Description |
+    |---|---|
+    | `estado` | New status — e.g., `APROBADO`, `RECHAZADO` |
+    | `notas` | Administrative notes or medical guidance |
+    | `tipo` | Type of injury classification |
+    | `fechaInicio` | Start of the recovery/rest period |
+    | `fechaFin` | End of the recovery/rest period |
+  </Step>
+  <Step title="Submit the evaluation">
+    The modal calls:
+
+    ```http
+    POST /lesiones/:id/evaluar
+    Content-Type: application/json
+
+    {
+      "estado": "APROBADO",
+      "notas": "Esguince de tobillo grado 1. Reposo 2 semanas.",
+      "tipo": "Esguince",
+      "fechaInicio": "2026-03-10",
+      "fechaFin": "2026-03-24"
+    }
+    ```
+
+    On success, the report is removed from the pending list and the page refreshes.
+  </Step>
+</Steps>
+
+---
+
+## Relationship to recovery sessions
+
+When an injury is approved with a `fechaInicio` and `fechaFin`, the system can generate **recovery sessions** (`recuperaciones`) — makeup class credits that the student can use once they recover. These are managed via:
+
+```http
+GET /recuperaciones/historial
+GET /recuperaciones/alumno/:id
+```
+
+<Note>
+  A payment blocked with `bloqueado_por_asistencia = true` may be related to unresolved recovery sessions. Resolving the injury evaluation and processing recovery sessions unblocks the payment.
+</Note>
+
+---
+
+## All injuries endpoint
+
+To query all injury records (not just pending ones) for administrative reporting:
+
+```http
+GET /lesiones
+```
+
+To query injury history for a specific student:
+
+```http
+GET /lesiones/alumno/:id
+```
+
+A student's own active injury reports are fetched via:
+
+```http
+GET /lesiones/mis-solicitudes
+```

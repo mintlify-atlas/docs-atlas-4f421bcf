@@ -1,0 +1,99 @@
+---
+title: "Class Enrollment"
+description: "How to browse available class schedules, enroll in one or more slots, and manage your registrations."
+---
+
+Enrollment is the process of reserving spots in class slots (horarios). Go to `/dashboard/student/enrollment` to get started.
+
+<Warning>
+  If you have an outstanding debt with status `PENDIENTE` or `PARCIAL`, enrollment is blocked. The **Aviso de Deuda Pendiente** banner appears and the confirmation button is hidden until your balance is cleared.
+</Warning>
+
+## Browsing available schedules
+
+All active schedules (`activo = true`) are loaded from `GET /horarios` when the page opens.
+
+### Filtering
+
+Use the two filter controls at the top of the schedule grid:
+
+- **Day filter** — a pill-button row for each day of the week (LUNES through DOMINGO, values 1–7). Only schedules for the selected day are shown.
+- **Location filter** — a dropdown to filter by sede (branch/location). Select **FILTRAR POR SEDE** to see all branches, or choose a specific sede name.
+
+### Schedule card fields
+
+Each schedule card shows:
+
+| Field | Source |
+|---|---|
+| Training level | `horario.niveles_entrenamiento.nombre` |
+| Court / location | `horario.cancha.nombre` and `horario.cancha.sede.nombre` |
+| Start and end time | `horario.hora_inicio` / `horario.hora_fin` |
+| Coordinator | `horario.profesor_id` |
+| Capacity | `horario.capacidad_max` |
+
+## Enrolling in classes
+
+<Steps>
+  <Step title="Select one or more schedules">
+    Click a schedule card to toggle its selection. Selected cards are highlighted. Your selections appear in the **Weekly Timeline** preview at the top of the page so you can visualise the week before confirming.
+
+    <Note>
+      The system automatically detects time conflicts. If you try to select two schedules that overlap on the same day, a **Cruce de horario** toast error appears and the conflicting selection is rejected.
+    </Note>
+  </Step>
+  <Step title="Confirm your enrollment">
+    Click the floating **Confirmar Matrícula (n)** button at the bottom of the screen. The button shows the number of selected schedules.
+
+    The system posts to `POST /inscripciones` with:
+
+    ```json
+    {
+      "alumno_id": "<your user ID>",
+      "horario_ids": [1, 2, 3]
+    }
+    ```
+  </Step>
+  <Step title="Confirm success">
+    A success toast **¡Inscripción Gema Completada!** confirms your enrollment. The page reloads with updated data and your selections are cleared.
+  </Step>
+</Steps>
+
+## Enrollment states
+
+Every enrollment record has an `estado` field. The possible values are:
+
+| Estado | Meaning |
+|---|---|
+| `ACTIVO` | Currently active enrollment — classes are running |
+| `SUSPENDIDO` | Enrollment is temporarily suspended |
+| `RETIRADO` | You have withdrawn from the class slot |
+
+In the My Registrations view, enrollments are also displayed with these internal UI states:
+
+| UI Label | `estado` value | Description |
+|---|---|---|
+| En Curso | `ACTIVO` | Active enrollment |
+| Validando | `POR_VALIDAR` | Awaiting admin validation |
+| Por Pagar | `PENDIENTE_PAGO` | Enrolled but payment pending |
+| Liquidación | `PEN-RECU` | In recovery settlement |
+| Historial | `FINALIZADO` | Ended cycle |
+
+## Viewing your enrollments
+
+Go to `/dashboard/student/myRegistrations` to see all your enrollment records. They are fetched from `GET /inscripciones/alumno/:id`.
+
+The page shows:
+- A header with the count of **Clases Activas** and total **Total Historial**.
+- Enrollment cards grouped by status, each showing the day of the week, time slot, court, and training level.
+
+### Withdrawing from a class
+
+From the My Registrations page, enrollments with status `ACTIVO` or `PENDIENTE_PAGO` have a trash icon button:
+
+- **ACTIVO** → clicking the button opens a confirmation dialog and calls `PATCH /inscripciones/:id/finalizar`. Your paid classes remain accessible through the end of the month and the spot is released for other students.
+- **PENDIENTE_PAGO** → clicking calls `PATCH /inscripciones/:id/cancelar-reserva`, which removes all slots in the same package and cancels the associated debt.
+
+<Info>
+  The capacity limit is defined by `capacidad_max` on each `horarios_clases` record. When a class is full, the backend returns an error and the enrollment is not created.
+</Info>

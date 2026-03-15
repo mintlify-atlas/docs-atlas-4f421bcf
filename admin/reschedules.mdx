@@ -1,0 +1,129 @@
+---
+title: "Mass Class Rescheduling"
+description: "Reschedule all classes on a given date in bulk, revert mass reschedules, and manage public holidays."
+---
+
+The **Reprogramación Masiva** panel (`/dashboard/admin/reschedules`) lets you handle situations where all classes on a given date must be moved — due to a national holiday, venue unavailability, or weather. Instead of editing each schedule individually, one action reschedules every class on that date.
+
+## When to use mass rescheduling
+
+<CardGroup cols={2}>
+  <Card title="Public holidays" icon="calendar-xmark">
+    The venue is closed and no classes can take place. Use mass reschedule to move all classes on that date to a compensation window.
+  </Card>
+  <Card title="Venue closures" icon="building-circle-xmark">
+    Temporary closure due to maintenance or events. Reschedule affected classes to an alternate date.
+  </Card>
+  <Card title="Emergency situations" icon="triangle-exclamation">
+    Unexpected closures that affect the entire academy calendar.
+  </Card>
+  <Card title="Holiday management" icon="umbrella-beach">
+    Register official non-class dates so the attendance system does not create sessions for those days.
+  </Card>
+</CardGroup>
+
+---
+
+## Performing a mass reschedule
+
+<Steps>
+  <Step title="Open the rescheduling editor">
+    Go to **Reschedules** (`/dashboard/admin/reschedules`). The main panel shows the **Editor de Reprogramación** with the `MassRescheduleForm` component.
+  </Step>
+  <Step title="Configure the reschedule batch">
+    Fill in the required fields in the form (original date and target date/window).
+  </Step>
+  <Step title="Submit">
+    The form calls:
+
+    ```http
+    POST /clases/reprogramar-masivo
+    Content-Type: application/json
+
+    {
+      "fecha_original": "2026-07-28",
+      "fecha_nueva": "2026-08-04"
+    }
+    ```
+
+    The system reschedules every class session that was scheduled for `fecha_original` to `fecha_nueva`. Each affected student is automatically notified (push notifications are noted as **Push Automáticas** in the UI).
+  </Step>
+  <Step title="Review the batch in the history panel">
+    The **Historial de Lotes** on the right sidebar shows all active mass reschedules fetched from:
+
+    ```http
+    GET /clases/reprogramaciones-masivas-activas
+    ```
+
+    The list is ordered newest first and scrollable up to 500px.
+  </Step>
+</Steps>
+
+---
+
+## Reverting a mass reschedule
+
+If the original situation is resolved and classes can return to their normal date, revert the reschedule:
+
+```http
+POST /clases/revertir-masivo
+Content-Type: application/json
+
+{
+  "reprogramacion_id": 12
+}
+```
+
+This moves all sessions back to their original date. The batch is removed from the active reschedules list.
+
+<Warning>
+  Reverting a mass reschedule affects all students enrolled in any class that was part of that batch. Verify that all affected students can attend on the original date before reverting.
+</Warning>
+
+---
+
+## Holiday management (feriados)
+
+The **Días Feriados** panel in the right sidebar manages official non-class dates. Click **Gestionar Calendario** to open the `FeriadoHistory` modal.
+
+### Adding a holiday
+
+```http
+POST /feriados
+Content-Type: application/json
+
+{
+  "fecha": "2026-12-25",
+  "descripcion": "Navidad"
+}
+```
+
+### Listing holidays
+
+```http
+GET /feriados
+```
+
+### Deleting a holiday
+
+```http
+DELETE /feriados/:id
+```
+
+<Info>
+  Holidays registered via `/feriados` prevent the attendance system from creating session records for those dates. Students and coordinators see holiday dates blocked in their calendar views.
+</Info>
+
+---
+
+## Impact on attendance and enrollment
+
+| Action | Effect on students |
+|---|---|
+| Mass reschedule | All sessions on the original date are moved. Attendance slots transfer to the new date. |
+| Mass revert | Sessions return to the original date. No duplicate attendance records are created. |
+| Holiday registration | No class sessions are generated for the holiday date. The attendance system skips that day. |
+
+<Note>
+  The system notes a **Ciclo +7 Días** safety window — mass reschedules must target a date at least 7 days in the future to allow adequate notice to students.
+</Note>

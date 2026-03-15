@@ -1,0 +1,359 @@
+---
+title: Schedules API
+description: Endpoints for managing class schedules, training levels, mass rescheduling operations, and holidays.
+---
+
+Schedule endpoints manage `horarios_clases`, `niveles_entrenamiento`, class session operations, and the `feriados` (holiday) calendar. Most write operations require an admin or coordinator role.
+
+---
+
+## GET /horarios
+
+Returns all class schedules. This is a public endpoint — no authentication is required.
+
+### Response
+
+<ResponseField name="success" type="boolean" required />
+
+<ResponseField name="data" type="object[]">
+  <Expandable title="schedule object">
+    <ResponseField name="id" type="number">Schedule ID.</ResponseField>
+    <ResponseField name="sede_id" type="number">Venue ID.</ResponseField>
+    <ResponseField name="cancha_id" type="number">Court ID.</ResponseField>
+    <ResponseField name="profesor_id" type="number">Professor user ID.</ResponseField>
+    <ResponseField name="nivel_id" type="number">Training level ID.</ResponseField>
+    <ResponseField name="dia_semana" type="number">Day of week: `1` = Monday … `7` = Sunday.</ResponseField>
+    <ResponseField name="hora_inicio" type="string">Start time in `HH:MM:SS` format.</ResponseField>
+    <ResponseField name="hora_fin" type="string">End time in `HH:MM:SS` format.</ResponseField>
+    <ResponseField name="capacidad_max" type="number">Maximum enrolled students. Default is `20`.</ResponseField>
+    <ResponseField name="activo" type="boolean">Whether the schedule is currently active.</ResponseField>
+  </Expandable>
+</ResponseField>
+
+---
+
+## GET /horarios/:id
+
+Returns a single schedule by ID.
+
+### Path parameters
+
+<ParamField path="id" type="number" required>
+  The schedule ID.
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean" required />
+<ResponseField name="data" type="object">
+  A single schedule object with the same fields as the list response.
+</ResponseField>
+
+---
+
+## POST /horarios
+
+Creates a new class schedule. Admin only.
+
+**Authentication:** Required (admin).
+
+### Request body
+
+<ParamField body="sede_id" type="number" required>
+  The venue (`sedes`) where the class takes place.
+</ParamField>
+
+<ParamField body="cancha_id" type="number" required>
+  The court (`canchas`) assigned to this schedule.
+</ParamField>
+
+<ParamField body="profesor_id" type="number" required>
+  The professor's user ID (`profesores.usuario_id`).
+</ParamField>
+
+<ParamField body="nivel_id" type="number" required>
+  The training level (`niveles_entrenamiento`) for this schedule.
+</ParamField>
+
+<ParamField body="dia_semana" type="number" required>
+  Day of the week. `1` = Monday, `7` = Sunday.
+</ParamField>
+
+<ParamField body="hora_inicio" type="string" required>
+  Start time in `HH:MM` format.
+</ParamField>
+
+<ParamField body="hora_fin" type="string" required>
+  End time in `HH:MM` format.
+</ParamField>
+
+<ParamField body="capacidad_max" type="number" default="20">
+  Maximum number of students. Defaults to `20`.
+</ParamField>
+
+<ParamField body="activo" type="boolean" default="true">
+  Whether the schedule is active immediately.
+</ParamField>
+
+<Warning>
+  The `(cancha_id, dia_semana, hora_inicio)` combination must be unique. The database enforces this with the `unica_cancha_hora` constraint.
+</Warning>
+
+### Response
+
+<ResponseField name="success" type="boolean" required />
+<ResponseField name="data" type="object">
+  The newly created schedule object.
+</ResponseField>
+
+---
+
+## PUT /horarios/:id
+
+Updates an existing schedule. Admin only.
+
+**Authentication:** Required (admin).
+
+### Path parameters
+
+<ParamField path="id" type="number" required>
+  The schedule ID to update.
+</ParamField>
+
+### Request body
+
+Send any subset of the POST body fields you want to change.
+
+### Response
+
+<ResponseField name="success" type="boolean" required />
+<ResponseField name="data" type="object">
+  The updated schedule object.
+</ResponseField>
+
+---
+
+## DELETE /horarios/:id
+
+Deletes a schedule. Admin only.
+
+**Authentication:** Required (admin).
+
+### Path parameters
+
+<ParamField path="id" type="number" required>
+  The schedule ID to delete.
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean" required />
+<ResponseField name="message" type="string">
+  Confirmation message.
+</ResponseField>
+
+---
+
+## GET /niveles
+
+Returns all training levels (`niveles_entrenamiento`).
+
+### Response
+
+<ResponseField name="success" type="boolean" required />
+<ResponseField name="data" type="object[]">
+  <Expandable title="level object">
+    <ResponseField name="id" type="number">Level ID.</ResponseField>
+    <ResponseField name="nombre" type="string">Level name (e.g. `Principiante`, `Intermedio`).</ResponseField>
+    <ResponseField name="precio_mensual" type="number">Monthly fee for this level in decimal format.</ResponseField>
+  </Expandable>
+</ResponseField>
+
+---
+
+## GET /niveles/:id
+
+Returns a single training level by ID.
+
+### Path parameters
+
+<ParamField path="id" type="number" required>
+  The training level ID.
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean" required />
+<ResponseField name="data" type="object">
+  A single level object.
+</ResponseField>
+
+---
+
+## POST /niveles
+
+Creates a new training level. Admin only.
+
+**Authentication:** Required (admin).
+
+### Request body
+
+<ParamField body="nombre" type="string" required>
+  Display name for the level (e.g. `Avanzado`).
+</ParamField>
+
+<ParamField body="precio_mensual" type="number" required>
+  Monthly price in decimal format (e.g. `150.00`).
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean" required />
+<ResponseField name="data" type="object">
+  The newly created level object.
+</ResponseField>
+
+---
+
+## GET /clases/horarios-con-asistencia
+
+Returns schedules enriched with attendance data. Designed for the coordinator's attendance dashboard.
+
+**Authentication:** Required (coordinator).
+
+### Response
+
+<ResponseField name="success" type="boolean" required />
+<ResponseField name="data" type="object[]">
+  Array of schedule objects, each including attendance summary fields.
+</ResponseField>
+
+---
+
+## POST /clases/reprogramar-masivo
+
+Mass-reschedules all classes from one date to another. Used when a date needs to be moved globally (e.g. due to an event).
+
+**Authentication:** Required (admin or coordinator).
+
+### Request body
+
+<ParamField body="fecha_original" type="string" required>
+  The original date of the classes to move, in `YYYY-MM-DD` format.
+</ParamField>
+
+<ParamField body="fecha_nueva" type="string" required>
+  The new date to reschedule the classes to, in `YYYY-MM-DD` format.
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean" required />
+<ResponseField name="data" type="object">
+  Summary of the reschedule operation.
+</ResponseField>
+
+---
+
+## POST /clases/revertir-masivo
+
+Reverts a previously applied mass reschedule, restoring classes to their original date.
+
+**Authentication:** Required (admin or coordinator).
+
+### Request body
+
+<ParamField body="fecha_original" type="string" required>
+  The original date of the classes before they were moved.
+</ParamField>
+
+<ParamField body="fecha_nueva" type="string" required>
+  The date the classes were moved to (used to identify the reschedule to revert).
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean" required />
+<ResponseField name="message" type="string">
+  Confirmation message.
+</ResponseField>
+
+---
+
+## GET /clases/reprogramaciones-masivas-activas
+
+Lists all currently active mass reschedules.
+
+**Authentication:** Required (admin or coordinator).
+
+### Response
+
+<ResponseField name="success" type="boolean" required />
+<ResponseField name="data" type="object[]">
+  Array of active mass reschedule records.
+</ResponseField>
+
+---
+
+## GET /feriados
+
+Lists all configured holidays.
+
+**Authentication:** Required.
+
+### Response
+
+<ResponseField name="success" type="boolean" required />
+<ResponseField name="data" type="object[]">
+  <Expandable title="holiday object">
+    <ResponseField name="id" type="number">Holiday ID.</ResponseField>
+    <ResponseField name="fecha" type="string">Date in `YYYY-MM-DD` format.</ResponseField>
+    <ResponseField name="nombre" type="string">Name or description of the holiday.</ResponseField>
+  </Expandable>
+</ResponseField>
+
+---
+
+## POST /feriados
+
+Creates a new holiday entry. Admin only.
+
+**Authentication:** Required (admin).
+
+### Request body
+
+<ParamField body="fecha" type="string" required>
+  The holiday date in `YYYY-MM-DD` format.
+</ParamField>
+
+<ParamField body="nombre" type="string" required>
+  A descriptive name for the holiday (e.g. `Día del Trabajo`).
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean" required />
+<ResponseField name="data" type="object">
+  The newly created holiday object.
+</ResponseField>
+
+---
+
+## DELETE /feriados/:id
+
+Deletes a holiday by ID. Admin only.
+
+**Authentication:** Required (admin).
+
+### Path parameters
+
+<ParamField path="id" type="number" required>
+  The holiday ID to delete.
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean" required />
+<ResponseField name="message" type="string">
+  Confirmation message.
+</ResponseField>

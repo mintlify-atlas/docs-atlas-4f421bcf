@@ -1,0 +1,100 @@
+---
+title: "Admin Dashboard"
+description: "Understand every panel on the main admin dashboard — KPI cards, financial charts, occupancy data, and the master Excel export."
+---
+
+The admin dashboard is the first page you see after logging in. It pulls live data from three API endpoints in parallel and renders a set of KPI cards and charts under the heading **Panel de Control**.
+
+## Data sources
+
+| Panel | Endpoint | Description |
+|---|---|---|
+| KPI cards | `GET /usuarios/count/usuarios-stats` | Student count, coordinator count, sede count, pending debt total |
+| Occupancy donut | `GET /sedes/dashboard/ocupacion` | Active students distributed by sede |
+| Income / payment charts | `GET /pagos` | All payment records; filtered client-side by selected year |
+
+---
+
+## KPI stat cards
+
+Four cards appear under **Resumen Ejecutivo**. Each displays a real-time value with an animated pulse indicator.
+
+| Card ID | Label | Source field | Format |
+|---|---|---|---|
+| `alumnos` | Total de Alumnos | `data.alumno` from stats endpoint | Integer |
+| `coordinadores` | Coordinadores | `data.coordinador` | Integer |
+| `sedes` | Sedes Activas | `data.sedes` | Integer |
+| `pendientes` | Deuda Pendiente | `data.deudaPendiente` | `S/ 0.00` currency |
+
+<Note>
+  The **Deuda Pendiente** value aggregates all `cuentas_por_cobrar` records with status `PENDIENTE` or `VENCIDO` across all students.
+</Note>
+
+---
+
+## Financial & operational charts
+
+All charts are grouped under **Inteligencia Financiera y Operativa**. You can switch the reference year using the year selector in the top-right of the income chart.
+
+### Validated cash flow (area chart)
+
+Shows monthly income from payments where `estado_validacion = 'APROBADO'`. The Y-axis is formatted as `S/ n,nnn`. Hover a data point to see the exact amount for that month.
+
+### Occupancy distribution (donut chart)
+
+Pulled from `GET /sedes/dashboard/ocupacion`. Each segment represents a sede with the number of active students enrolled in its classes. The center of the donut shows the total across all sedes.
+
+### Payment channel breakdown (bar chart)
+
+Groups approved payments by `metodos_pago.nombre`. The four known methods are **YAPE**, **PLIN**, **TRANSFERENCIA**, and **EFECTIVO**. Only methods with at least one approved payment in the selected year appear.
+
+### Gender segmentation (donut chart)
+
+From `data.alumnosGenero` returned by the stats endpoint:
+- **Femenino** — `genero = 'F'`
+- **Masculino** — `genero = 'M'`
+
+### Age range distribution (bar chart)
+
+From `data.alumnosEdades`, which returns bucketed age ranges with a `range` label and `count`. Each bar is color-coded by Gema's palette (`#1e3a8a`, `#f97316`, `#3b82f6`, etc.).
+
+---
+
+## Recent activity feed
+
+The **Movimiento Reciente del Club** panel shows `data.actividadReciente` from the stats endpoint. Each item has a `type` (`pago`, `alumno`, or generic), a `text` description, and a `date`.
+
+---
+
+## Master Excel export
+
+The **Reporte Maestro** card lets you download a multi-sheet workbook containing:
+
+| Sheet name | Content |
+|---|---|
+| `Directorio_Alumnos` | Full student directory |
+| `Inscripciones_Activas` | Current active enrollments |
+| `Historial_Pagos` | All validated payment records |
+| `Cuentas_Pendientes` | Outstanding `cuentas_por_cobrar` |
+
+The export calls `GET /usuarios/reporte/detallado` and uses **xlsx-js-style** to apply Gema blue (`#1E3A8A`) header cells with white text. The file is saved as `Reporte_Inteligencia_Gema_YYYY-MM-DD.xlsx`.
+
+<Warning>
+  The export button is disabled while a download is in progress to prevent duplicate requests.
+</Warning>
+
+---
+
+## How to interpret the data
+
+<Accordion title="Occupancy shows 'Sin Datos'">
+  This appears when the `/sedes/dashboard/ocupacion` endpoint returns an empty array. It means no active students are currently enrolled in any class across all sedes. Check that schedules exist and students are enrolled.
+</Accordion>
+
+<Accordion title="Pending debt is unexpectedly high">
+  The pending debt total includes all `cuentas_por_cobrar` not yet marked `PAGADO`. Review the **Payments** page and check for records with status `VENCIDO` — these are overdue and need follow-up.
+</Accordion>
+
+<Accordion title="A payment method does not appear in the chart">
+  Only methods with at least one `APROBADO` payment in the selected year are shown. Switch the year selector to see other periods.
+</Accordion>

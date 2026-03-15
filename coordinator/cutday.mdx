@@ -1,0 +1,138 @@
+---
+title: "Cut Day Management"
+description: "How to use the Día de Corte view to monitor student billing cycle status and identify overdue accounts."
+---
+
+## What Is a Día de Corte?
+
+A **Día de Corte** (cut day) is the billing cycle deadline for each enrolled student. Academia Gema uses a **30-day cycle** with no grace period: the cut date is exactly 30 days after the student's contract start date (`contratos[0].fecha_inicio`), and the system treats that deadline as a strict payment limit.
+
+> "El sistema no considera días de gracia. La fecha de corte es el límite estricto de pago."
+
+As a coordinator, you do not process payments — that is handled by the administration team. Your role is to identify which students are overdue so that the admin can follow up.
+
+---
+
+## Navigating to the View
+
+Open **Días de Corte** from the sidebar (`/dashboard/teacher/DiaCorte`). The page loads the full student list by calling:
+
+```http
+GET /alumno/gestion/resumen-cortes
+```
+
+The response is assigned to `json.data` and rendered in a table. Each row represents one student enrolled in the academy.
+
+---
+
+## Reading the Report Table
+
+The table has five columns:
+
+| Column | Description |
+|--------|-------------|
+| **Datos del Alumno** | Student's full name (`nombre_completo`) |
+| **Nro Documento** | Student's DNI / identification number |
+| **Inscripción** | Contract start date from `contratos[0].fecha_inicio`, formatted as `dd/MM/yyyy` |
+| **Fecha Corte (+30d)** | Inscription date + 30 days, shown as `dd de MMMM` (e.g., `14 de Abril`) |
+| **Estado de Ciclo** | Color-coded badge indicating payment status |
+
+### Cycle Status Badges
+
+<CardGroup cols={3}>
+  <Card title="Ciclo al día" icon="circle-check">
+    **Green.** The cut date is in the future. The student's account is current.
+  </Card>
+  <Card title="Vence Hoy" icon="circle-exclamation">
+    **Orange.** The cut date is today. Payment is due immediately.
+  </Card>
+  <Card title="Ciclo Atrasado" icon="circle-xmark">
+    **Red (pulsing).** The cut date is in the past. The student has an overdue balance.
+  </Card>
+</CardGroup>
+
+<Warning>
+  **Ciclo Atrasado** badges pulse to draw immediate attention. Students in this state should be escalated to the admin team for payment follow-up as soon as possible.
+</Warning>
+
+---
+
+## Searching and Filtering
+
+The page provides two controls to narrow the list:
+
+### Search Bar
+
+Type any combination of words in the search box. The search is **word-order independent** — it splits your input on whitespace and checks that every word appears somewhere in the student's name or DNI.
+
+```
+Example: "torres ana" will match "Ana Torres" even though the order is reversed.
+```
+
+You can search by:
+- Full or partial name (`nombres` or `apellidos`)
+- DNI / document number
+
+### Status Filter Dropdown
+
+| Option | Shows |
+|--------|-------|
+| **Todos los Alumnos** | Every student in the dataset |
+| **Alumnos con Deuda** | Only students whose cut date is in the past (`vencido = true`) |
+| **Vencen Hoy** | Only students whose cut date is today (`esHoy = true`) |
+
+<Tip>
+  Start your shift by selecting **Alumnos con Deuda** to get an immediate list of students who need payment attention. Share this list with the admin team at the beginning of each week.
+</Tip>
+
+---
+
+## How the Cut Date Is Calculated
+
+The client computes the cut date locally using `date-fns`:
+
+```js
+const fechaCorte = addDays(new Date(contratos[0].fecha_inicio), 30);
+const vencido   = isPast(fechaCorte) && !isToday(fechaCorte);
+const esHoy     = isToday(fechaCorte);
+```
+
+This means:
+- The 30-day clock starts on the contract's `fecha_inicio`
+- A student whose `fecha_inicio` was `2026-02-14` has a cut date of `2026-03-16`
+- On `2026-03-16` the badge shows **Vence Hoy**; from `2026-03-17` onward it shows **Ciclo Atrasado**
+
+---
+
+## Relationship to the Payment Workflow
+
+As a coordinator, you have **read-only** access to this report. The payment workflow involves separate admin actions:
+
+<Steps>
+  <Step title="You identify overdue accounts">
+    Use the **Alumnos con Deuda** filter to compile the list of students whose 30-day cycle has expired.
+  </Step>
+  <Step title="Admin is notified">
+    Share the list with the administration team. The admin can view outstanding balances in `cuentas_por_cobrar` and process payments through the admin panel.
+  </Step>
+  <Step title="Payment is recorded">
+    The admin validates the payment, which updates the `pagos` table and the student's `cuentas_por_cobrar.estado` to `PAGADO`.
+  </Step>
+  <Step title="New cycle begins">
+    Once payment is confirmed, the admin may renew the student's contract, resetting the `fecha_inicio` and starting a fresh 30-day cycle.
+  </Step>
+</Steps>
+
+<Note>
+  The Día de Corte view reflects contract data, not payment records directly. A student's badge may still show **Ciclo Atrasado** until the admin updates the underlying contract or enrollment records.
+</Note>
+
+---
+
+## Empty State
+
+If no students match your current search term and filter combination, the page displays:
+
+> *"No se encontraron alumnos bajo ese criterio"*
+
+Clear the search field or reset the dropdown to **Todos los Alumnos** to restore the full list.

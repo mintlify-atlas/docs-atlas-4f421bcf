@@ -1,0 +1,229 @@
+---
+title: "Taking Attendance"
+description: "How to view your scheduled sessions and record attendance for each enrolled student using the Mis Clases dashboard."
+---
+
+## Overview
+
+The **Mis Clases** page (`/dashboard/teacher`) is your primary working view. It fetches every training session assigned to you — across the entire season — and lets you record each athlete's attendance status with a single click per student.
+
+Attendance data is stored in the `registros_asistencia` table. The database enforces a unique constraint (`asistencia_unica_diaria`) on `(inscripcion_id, fecha)`, so each student can have at most one attendance record per session date.
+
+---
+
+## Viewing Your Schedule
+
+When the page loads, the front end calls:
+
+```http
+GET /asistencias/agenda
+```
+
+This endpoint returns every `horarios_clases` record linked to your coordinator account, including each student's `registros_asistencia` entries. The client groups individual attendance records by date to produce one **session card** per unique class date.
+
+Each card displays:
+
+| Field | Source |
+|-------|--------|
+| Training level | `niveles_entrenamiento.nombre` (e.g., `BASICO-C`) |
+| Time range | `horarios_clases.hora_inicio – hora_fin` (or rescheduled override) |
+| Court | `canchas.nombre` (e.g., `T1`) |
+| Athlete count | Number of enrollments active on that date |
+| Date badge | Computed from each `registros_asistencia.fecha` |
+
+### Filtering the Agenda
+
+Use the two dropdowns in the filter bar to narrow the session list:
+
+- **Month** — defaults to `TODOS LOS MESES` (full season view); selecting a month shows only sessions in that calendar month.
+- **Year** — defaults to the current year; values available are `2025`, `2026`, `2027`.
+
+<Tip>
+  Leave the filter set to **TODOS** when you first open the page. The view automatically scrolls to today's session so you can start taking attendance immediately.
+</Tip>
+
+### Session States
+
+Each card is styled to indicate its temporal state:
+
+| Visual | Meaning |
+|--------|---------|
+| Orange left border + "LIVE SESSION" badge | Today's session |
+| Blue left border | A past session (attendance can still be edited) |
+| Greyed-out card + disabled button | Future session — locked until the date arrives |
+| Green "SESIÓN FINALIZADA" badge | All students have a non-`PROGRAMADA`/`PENDIENTE` status |
+| Orange "REPROGRAMADA (ADMIN)" badge | The session was rescheduled by an administrator |
+
+---
+
+## Opening the Attendance Modal
+
+Click the button on a session card:
+
+- **TOMAR ASISTENCIA** — for today's or a past session
+- **VER ASISTENCIA** — for already-completed past sessions
+
+<Warning>
+  Future sessions are locked. The button is disabled and shows no action until the session date arrives.
+</Warning>
+
+The modal header shows the class level, formatted date, and time range. The scrollable body lists every enrolled student with their full name and document number (`DNI`).
+
+---
+
+## Marking Attendance
+
+For each student you see two action buttons:
+
+<CardGroup cols={2}>
+  <Card title="PRESENTE" icon="check">
+    Green checkmark button. Marks the student as present. Maps to `estado = 'PRESENTE'` in `registros_asistencia`.
+  </Card>
+  <Card title="FALTA" icon="user-minus">
+    Red button. Marks the student as absent. Maps to `estado = 'FALTA'` in `registros_asistencia`.
+  </Card>
+</CardGroup>
+
+<Info>
+  The database schema defines the `estado` column with a `CHECK` constraint accepting `PRESENTE`, `AUSENTE`, `TARDE`, and `JUSTIFICADO`. The attendance modal currently maps absences to `FALTA` on the client side; the backend normalizes this to the appropriate constrained value.
+</Info>
+
+### Special Student Badges
+
+Two badge types can appear alongside a student's name in the modal:
+
+| Badge | Meaning | Effect on buttons |
+|-------|---------|-------------------|
+| **RECUPERACIÓN** (blue) | The student is attending a make-up session for a previously missed class | Buttons remain active |
+| **JUSTIFICADO MÉD.** (orange) | The student has a medically justified absence (`estado = 'JUSTIFICADO_LESION'`) | Both buttons are **disabled** — the record is locked |
+
+---
+
+## Saving Attendance
+
+Once you have set the status for every student, click **GUARDAR ASISTENCIA DEL GRUPO** at the bottom of the modal.
+
+This sends a single bulk request:
+
+```http
+POST /asistencias/masiva
+```
+
+```json
+{
+  "asistencias": [
+    { "id": 44, "estado": "PRESENTE", "comentario": "" },
+    { "id": 45, "estado": "FALTA",   "comentario": "" }
+  ]
+}
+```
+
+Each object in the array contains the `registros_asistencia.id` and the new `estado`. The `comentario` field is sent as an empty string by default.
+
+On success:
+- A toast notification confirms `"Asistencia guardada con éxito"`
+- The modal closes
+- The agenda refreshes automatically (re-fetches `/asistencias/agenda`)
+
+On failure:
+- A toast notification shows `"Error al guardar la asistencia"`
+- The modal stays open so you can retry
+
+---
+
+## Correcting a Previously Recorded Attendance
+
+Because the unique constraint (`asistencia_unica_diaria`) prevents duplicate records, correcting attendance means **updating** the existing record, not creating a new one.
+
+<Steps>
+  <Step title="Find the session card">
+    Use the month/year filter to locate the session. Past sessions with completed attendance display a green **SESIÓN FINALIZADA** badge.
+  </Step>
+  <Step title="Open the modal">
+    Click **VER ASISTENCIA**. The modal loads with each student's current recorded status pre-selected.
+  </Step>
+  <Step title="Change the status">
+    Click the **PRESENTE** or **FALTA** button for the student whose record needs correcting. The change is local until you save.
+  </Step>
+  <Step title="Save">
+    Click **GUARDAR ASISTENCIA DEL GRUPO**. The `PATCH /asistencias/{id}` path is used internally via `asistenciaService.marcarAsistencia` for individual corrections, or the bulk endpoint handles the full group update.
+  </Step>
+</Steps>
+
+<Note>
+  Students marked **JUSTIFICADO MÉD.** (`JUSTIFICADO_LESION`) cannot be changed through this modal. Contact the administrator to modify injury-justified absences.
+</Note>
+
+---
+
+## API Reference
+
+<AccordionGroup>
+  <Accordion title="GET /asistencias/agenda">
+    Returns the full training agenda for the authenticated coordinator. Response shape:
+
+    ```json
+    {
+      "data": [
+        {
+          "id": 12,
+          "hora_inicio": "08:00",
+          "hora_fin": "09:30",
+          "niveles_entrenamiento": { "nombre": "BASICO-C" },
+          "canchas": { "nombre": "T1" },
+          "inscripciones": [
+            {
+              "id": 44,
+              "estado": "ACTIVO",
+              "alumnos": {
+                "usuarios": {
+                  "nombres": "Ana",
+                  "apellidos": "Torres",
+                  "numero_documento": "12345678"
+                }
+              },
+              "registros_asistencia": [
+                {
+                  "id": 201,
+                  "fecha": "2026-03-15T00:00:00.000Z",
+                  "estado": "PROGRAMADA"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="POST /asistencias/masiva">
+    Records attendance for a group of students in a single request.
+
+    **Request body:**
+    ```json
+    {
+      "asistencias": [
+        { "id": 201, "estado": "PRESENTE", "comentario": "" },
+        { "id": 202, "estado": "FALTA",   "comentario": "" }
+      ]
+    }
+    ```
+
+    Each `id` is a `registros_asistencia.id`.
+  </Accordion>
+
+  <Accordion title="PATCH /asistencias/{id}">
+    Updates a single attendance record.
+
+    **Request body:**
+    ```json
+    {
+      "estado": "TARDE",
+      "comentario": "Llegó 10 minutos tarde"
+    }
+    ```
+
+    Valid `estado` values: `PRESENTE`, `AUSENTE`, `TARDE`, `JUSTIFICADO`.
+  </Accordion>
+</AccordionGroup>

@@ -1,0 +1,116 @@
+---
+title: API overview
+description: Base URL configuration, authentication, standard response format, and a map of all available API resource groups.
+---
+
+The Academia Gema REST API is consumed by the React frontend. Every request targets a single base URL configured via an environment variable, and authentication is handled entirely through HTTP-only cookies — no `Authorization` headers are needed.
+
+## Base URL
+
+All endpoints are relative to the value of the `VITE_API_URL` environment variable set at build time.
+
+```bash
+# .env (local development)
+VITE_API_URL=http://localhost:3000
+```
+
+In production this variable is set in your hosting dashboard (Netlify or Railway). See [Environment variables](/deployment/environment-variables) for details.
+
+## Authentication
+
+The API uses JWT tokens stored in HTTP-only cookies. The browser sends them automatically on every request — you never read or write them from JavaScript.
+
+To ensure cookies are included you **must** add `credentials: "include"` to every `fetch` call (the `apiFetch` interceptor does this automatically):
+
+```javascript
+const response = await fetch(`${API_URL}/some/endpoint`, {
+  method: 'GET',
+  credentials: 'include', // required — sends the HTTP-only JWT cookie
+});
+```
+
+On a successful login the server sets the JWT cookie **and** the client writes four readable cookies for UI use:
+
+| Cookie | Value |
+|---|---|
+| `user_role` | The user's role string (e.g. `ADMIN`, `ALUMNO`, `PROFESOR`) |
+| `user_name` | User's first name (`nombres`) |
+| `user_lastname` | User's last name (`apellidos`) |
+| `user_id` | User's numeric ID |
+
+These cookies expire after 1 day, are `sameSite: strict`, and are `secure` on HTTPS origins.
+
+## Token refresh
+
+When any authenticated request returns `401` the interceptor automatically calls `POST /auth/refresh` to obtain a new JWT, then retries the original request. If the refresh also fails, all session cookies are cleared and the user is redirected to `/login`.
+
+```javascript
+// Simplified flow in src/interceptors/api.js
+if (response.status === 401 && !endpoint.includes('/auth/')) {
+  const refreshRes = await fetch(`${API_URL}/auth/refresh`, {
+    method: 'POST',
+    credentials: 'include',
+  });
+  if (refreshRes.ok) {
+    // retry original request
+  } else {
+    // clear cookies, redirect to /login
+  }
+}
+```
+
+<Note>
+  Auth routes (`/auth/*`) are excluded from the automatic refresh loop to prevent infinite retries.
+</Note>
+
+## Standard response format
+
+Every endpoint returns JSON in the same envelope:
+
+```json
+{
+  "success": true,
+  "data": { },
+  "message": "OK"
+}
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `success` | `boolean` | `true` when the request was processed without errors. |
+| `data` | `any` | The actual payload — an object, array, or `null`. |
+| `message` | `string` | Human-readable status or error message. |
+
+## Error handling
+
+The frontend checks `response.ok` after every call and throws with `result.message`:
+
+```javascript
+const response = await fetch(url, options);
+const result = await response.json();
+if (!response.ok) throw new Error(result.message || 'Server error');
+return result.data;
+```
+
+## API resource groups
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="lock" href="/api/auth">
+    Login, logout, password reset, profile updates, and token refresh.
+  </Card>
+  <Card title="Schedules" icon="calendar" href="/api/schedules">
+    Class schedules, training levels, mass rescheduling, and holidays.
+  </Card>
+  <Card title="Enrollments" icon="clipboard-list" href="/api/enrollments">
+    Student enrollments and recovery sessions.
+  </Card>
+  <Card title="Payments" icon="credit-card" href="/api/payments">
+    Payment reporting, validation, accounts receivable, and pricing catalog.
+  </Card>
+  <Card title="Attendance" icon="check-square" href="/api/attendance">
+    Attendance records, statistics, and injury tracking.
+  </Card>
+  <Card title="Users" icon="users" href="/api/users">
+    User management for students, professors, and coordinators.
+  </Card>
+</CardGroup>

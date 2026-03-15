@@ -1,0 +1,130 @@
+---
+title: "Teacher & Coordinator Management"
+description: "Register, view, and edit coordinators in Academia Gema. Learn how to assign coordinators to class schedules."
+---
+
+Academia Gema uses the role name **Coordinador** for the staff members who lead classes. The **Teacher/Coordinator Management** module (`/dashboard/admin/teachers`) gives you a searchable card grid of all coordinators and tools to register new ones or update existing profiles.
+
+<Note>
+  In the database the role is stored as `Coordinador`. The API routes use `/role/coordinador`. The UI labels them as "Staff Técnico Gema".
+</Note>
+
+## Viewing coordinators
+
+The module fetches all coordinators from:
+
+```http
+GET /usuarios/role/coordinador
+```
+
+Each card shows:
+- Full name (`nombres` + `apellidos`)
+- Specialization (`coordinadores.especializacion`)
+- A **Ver Perfil Técnico** button to open the detail view
+
+Use the search bar to filter by name or specialization in real time.
+
+---
+
+## Coordinator fields
+
+### Base user fields (stored in `usuarios`)
+
+| Field | Type | Description |
+|---|---|---|
+| `nombres` | string | First name(s) |
+| `apellidos` | string | Last name(s) |
+| `email` | string | Login email (unique) |
+| `telefono_personal` | string | Personal phone number |
+| `tipo_documento_id` | string | Document type (e.g., `DNI`) |
+| `numero_documento` | string | Document number |
+| `fecha_nacimiento` | date | Date of birth |
+| `genero` | string | `M` or `F` |
+
+### Role-specific fields (stored in `coordinadores`)
+
+| Field | Type | Description |
+|---|---|---|
+| `especializacion` | string | Coaching specialization (e.g., `Formación Sub-12`) |
+
+<Info>
+  The original SQL schema uses a `profesores` table with `especializacion` and `tarifa_hora` fields. The current Prisma model maps this to the `coordinadores` table with `especializacion`.
+</Info>
+
+---
+
+## Registering a new coordinator
+
+<Steps>
+  <Step title="Open the create form">
+    Click **Registrar Coordinador** in the top-right corner of the coordinator list. This renders the `AdminTeachers` form.
+  </Step>
+  <Step title="Fill in the required fields">
+    Complete all required fields: `nombres`, `apellidos`, `email`, `password`, `tipo_documento_id`, `numero_documento`, `fecha_nacimiento`, `genero`, and `especializacion`.
+  </Step>
+  <Step title="Submit">
+    The form calls:
+
+    ```http
+    POST /usuarios/register
+    Content-Type: application/json
+
+    {
+      "nombres": "Carlos",
+      "apellidos": "Ramos Díaz",
+      "email": "c.ramos@gema.com",
+      "password": "TempPass2026!",
+      "rol_id": "coordinador",
+      "tipo_documento_id": "DNI",
+      "numero_documento": "87654321",
+      "telefono_personal": "+51912345678",
+      "fecha_nacimiento": "1990-07-20",
+      "genero": "M",
+      "datosRolEspecifico": {
+        "especializacion": "Voleibol Formativo"
+      }
+    }
+    ```
+  </Step>
+</Steps>
+
+---
+
+## Editing a coordinator profile
+
+<Steps>
+  <Step title="Open the coordinator detail">
+    Find the coordinator in the grid and click **Ver Perfil Técnico**.
+  </Step>
+  <Step title="Click Editar Perfil">
+    This loads `AdminTeacherEdit` pre-filled with the current data.
+  </Step>
+  <Step title="Save changes">
+    The edit form sends a PATCH request to the coordinator's endpoint:
+
+    ```http
+    PATCH /coordinadores/:id
+    Content-Type: application/json
+
+    {
+      "nombres": "Carlos",
+      "apellidos": "Ramos Díaz",
+      "email": "c.ramos@gema.com",
+      "telefono_personal": "+51912345678",
+      "especializacion": "Voleibol Avanzado"
+    }
+    ```
+  </Step>
+</Steps>
+
+<Warning>
+  Passwords and credentials are managed separately and are not editable from this form for security reasons.
+</Warning>
+
+---
+
+## Assigning coordinators to schedules
+
+When creating or editing a class schedule, the `coordinador_id` field is populated from the coordinator list. See [Schedule Management](/admin/schedules) for the full workflow.
+
+A coordinator can be assigned to multiple schedules simultaneously. You can filter the schedule list by coordinator name using the **Todos los Coordinadores** dropdown on the schedules panel.

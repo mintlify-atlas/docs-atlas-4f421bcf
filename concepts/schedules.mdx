@@ -1,0 +1,136 @@
+---
+title: "Scheduling system"
+description: "How class schedules are structured, browsed, and managed in Academia Gema."
+---
+
+The scheduling system defines when and where volleyball training happens. Every class slot is a row in the `horarios_clases` table, linking a location, court, coordinator, training level, day of week, and time window.
+
+## Data model
+
+```sql
+CREATE TABLE horarios_clases (
+    id           SERIAL PRIMARY KEY,
+    sede_id      INT NOT NULL REFERENCES sedes(id),
+    cancha_id    INT REFERENCES canchas(id),
+    profesor_id  INT NOT NULL REFERENCES profesores(usuario_id),
+    nivel_id     INT NOT NULL REFERENCES niveles_entrenamiento(id),
+    dia_semana   INT NOT NULL CHECK (dia_semana BETWEEN 1 AND 7),
+    hora_inicio  TIME NOT NULL,
+    hora_fin     TIME NOT NULL,
+    capacidad_max INT DEFAULT 20,
+    activo       BOOLEAN DEFAULT TRUE,
+    CONSTRAINT unica_cancha_hora UNIQUE (cancha_id, dia_semana, hora_inicio)
+);
+```
+
+Key design decisions:
+
+- A unique constraint on `(cancha_id, dia_semana, hora_inicio)` prevents double-booking a court at the same time on the same day.
+- `capacidad_max` defaults to 20 students per slot. Enrollment is blocked once this limit is reached.
+- `activo = FALSE` deactivates a slot without deleting historical enrollment or attendance data.
+
+## Days of the week
+
+The `dia_semana` column uses integer values 1 through 7:
+
+| Value | Day |
+|-------|-----|
+| 1 | Monday (Lunes) |
+| 2 | Tuesday (Martes) |
+| 3 | Wednesday (Miércoles) |
+| 4 | Thursday (Jueves) |
+| 5 | Friday (Viernes) |
+| 6 | Saturday (Sábado) |
+| 7 | Sunday (Domingo) |
+
+## Supporting tables
+
+**Locations (`sedes`) and courts (`canchas`):**
+
+```sql
+CREATE TABLE sedes (
+    id           SERIAL PRIMARY KEY,
+    direccion_id INT NOT NULL REFERENCES direcciones(id),
+    nombre       VARCHAR(100) NOT NULL,  -- e.g. 'Sede Norte'
+    activo       BOOLEAN DEFAULT TRUE
+);
+
+CREATE TABLE canchas (
+    id      SERIAL PRIMARY KEY,
+    sede_id INT NOT NULL REFERENCES sedes(id),
+    nombre  VARCHAR(50) NOT NULL,        -- e.g. 'Cancha 1 - Techada'
+    descripcion VARCHAR(200)
+);
+```
+
+**Training levels (`niveles_entrenamiento`):**
+
+```sql
+CREATE TABLE niveles_entrenamiento (
+    id             SERIAL PRIMARY KEY,
+    nombre         VARCHAR(50) NOT NULL,  -- e.g. 'Principiante', 'Intermedio'
+    precio_mensual DECIMAL(10, 2) NOT NULL
+);
+```
+
+## API endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/horarios` | List all active schedules |
+| `GET` | `/horarios/:id` | Get a single schedule by ID |
+| `POST` | `/horarios` | Create a new schedule slot |
+| `PUT` | `/horarios/:id` | Update a schedule slot |
+| `DELETE` | `/horarios/:id` | Deactivate a schedule slot |
+| `GET` | `/sedes/activas` | List active locations |
+| `GET` | `/sedes/dashboard/ocupacion` | Occupancy stats per location |
+| `GET` | `/niveles` | List all training levels |
+
+## Public schedule browser
+
+The public home page at `/` includes a schedule browser that any visitor can use without logging in. It displays all active `horarios_clases` rows and supports filtering by:
+
+- **Day of week** — shows slots for a specific `dia_semana`
+- **Training level** — filters by `nivel_id`
+
+This lets prospective students browse available classes before registering.
+
+## Admin schedule management
+
+Admins manage schedules at `/dashboard/admin/schedule`. The interface lets you:
+
+- Create a new class slot by selecting sede, cancha, coordinador, nivel, day, start time, end time, and capacity.
+- Edit or deactivate existing slots.
+- View current enrollment counts against `capacidad_max`.
+
+<Note>
+  Only users with the `Administrador` role can access `/dashboard/admin/schedule`.
+</Note>
+
+## Capacity limits
+
+Each schedule slot has a `capacidad_max` value (default: 20). When a student attempts to enroll:
+
+1. The backend counts active enrollments (`estado = 'ACTIVO'`) for the `horario_id`.
+2. If the count equals `capacidad_max`, the enrollment is rejected.
+
+Admins can increase `capacidad_max` for a specific slot if they need to admit more students.
+
+## Class rescheduling and holidays
+
+Academia Gema supports bulk rescheduling operations for exceptional events.
+
+**Holiday management** — Admins create holiday records via `POST /feriados`. On a holiday date, affected sessions can be skipped or rescheduled.
+
+**Bulk reschedule** — The endpoint `POST /clases/reprogramar-masivo` moves a group of sessions to a new date and time in one operation. `POST /clases/revertir-masivo` rolls back a bulk reschedule.
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /feriados` | List all holidays |
+| `POST /feriados` | Create a holiday |
+| `DELETE /feriados/:id` | Remove a holiday |
+| `POST /clases/reprogramar-masivo` | Bulk reschedule sessions |
+| `POST /clases/revertir-masivo` | Revert a bulk reschedule |
+| `GET /clases/horarios-con-asistencia` | List schedule slots with their attendance records |
+
+Admins manage rescheduling at `/dashboard/admin/reprogramaciones`.

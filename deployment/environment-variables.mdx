@@ -1,0 +1,121 @@
+---
+title: Environment variables
+description: Reference for all environment variables used by the Academia Gema frontend, with setup instructions for Netlify, Railway, and local development.
+---
+
+The Academia Gema frontend uses Vite's environment variable system. Variables prefixed with `VITE_` are embedded into the JavaScript bundle at build time and accessible in the browser via `import.meta.env`.
+
+<Warning>
+  Because `VITE_` variables are embedded at build time, changing an environment variable requires a **new build** to take effect. You cannot update `VITE_API_URL` at runtime without rebuilding.
+</Warning>
+
+## Variable reference
+
+### VITE_API_URL
+
+**Required.** The base URL of the backend REST API. Every API request is prefixed with this value.
+
+```javascript
+// src/interceptors/api.js (and all service files)
+const API_URL = import.meta.env.VITE_API_URL;
+
+// Results in: https://api.yourdomain.com/auth/login
+await fetch(`${API_URL}/auth/login`, { credentials: 'include' });
+```
+
+| Property | Value |
+|---|---|
+| Required | Yes |
+| Used in | `src/interceptors/api.js`, `src/services/auth.service.js`, and all service files |
+| Example | `https://api.yourdomain.com` |
+
+<Warning>
+  Do not include a trailing slash. All API route constants in `src/constants/apiRoutes.js` already start with `/`.
+</Warning>
+
+---
+
+### NODE_ENV
+
+**Standard Node.js variable.** Set automatically by most build systems. Vite sets it to `"production"` during `npm run build`.
+
+| Property | Value |
+|---|---|
+| Required | No (set automatically) |
+| Production value | `production` |
+| Development value | `development` |
+
+---
+
+### PORT
+
+**Used by the preview server (Railway).** When `npm start` is run (which executes `vite preview --host 0.0.0.0 --port ${PORT:-4173}`), the server listens on this port. Railway injects it automatically.
+
+| Property | Value |
+|---|---|
+| Required | No |
+| Default | `4173` (or `8080` as configured in `vite.config.js`) |
+| Set by | Railway (automatic) |
+
+---
+
+## Example .env file
+
+For local development, create a `.env` file in the root of the `Front/` directory:
+
+```bash
+# .env
+# Required: backend REST API base URL
+VITE_API_URL=http://localhost:3000
+```
+
+<Note>
+  Add `.env` to `.gitignore`. Never commit real API URLs or secrets to version control.
+</Note>
+
+Vite also supports environment-specific files:
+
+| File | When loaded |
+|---|---|
+| `.env` | Always |
+| `.env.local` | Always (overrides `.env`, not committed) |
+| `.env.development` | `npm run dev` only |
+| `.env.production` | `npm run build` only |
+
+---
+
+## Setting variables per platform
+
+<Tabs>
+  <Tab title="Netlify">
+    1. Open your site in the [Netlify dashboard](https://app.netlify.com).
+    2. Go to **Site configuration → Environment variables**.
+    3. Click **Add a variable** and enter `VITE_API_URL` as the key and your API URL as the value.
+    4. Redeploy the site — Netlify rebuilds with the new variable embedded.
+
+    You can also scope variables per deploy context (Production, Branch deploys, Deploy previews).
+  </Tab>
+  <Tab title="Railway">
+    1. Open your service in the [Railway dashboard](https://railway.app).
+    2. Go to the **Variables** tab.
+    3. Click **New Variable** and enter `VITE_API_URL` and its value.
+    4. Railway automatically redeploys the service with the updated variable.
+
+    `PORT` is injected by Railway automatically — you do not need to set it manually.
+  </Tab>
+  <Tab title="Local development">
+    Create a `.env` file in the `Front/` directory:
+
+    ```bash
+    VITE_API_URL=http://localhost:3000
+    ```
+
+    Then start the dev server:
+
+    ```bash
+    npm run dev
+    ```
+
+    Vite reads `.env` automatically. Changes to `.env` require restarting the dev server.
+  </Tab>
+</Tabs>

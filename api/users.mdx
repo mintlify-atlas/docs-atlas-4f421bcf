@@ -1,0 +1,317 @@
+---
+title: Users API
+description: Endpoints for managing users across all roles — students, professors, coordinators, and admins.
+---
+
+User endpoints cover registration, profile retrieval, updates, and reporting across all roles. Most endpoints require admin access; students access only their own profile.
+
+---
+
+## GET /usuarios
+
+Returns all users regardless of role.
+
+**Authentication:** Required (admin).
+
+### Response
+
+<ResponseField name="success" type="boolean" required />
+<ResponseField name="data" type="object[]">
+  <Expandable title="user object">
+    <ResponseField name="id" type="number">User ID.</ResponseField>
+    <ResponseField name="rol_id" type="number">Foreign key to `roles.id`.</ResponseField>
+    <ResponseField name="nombres" type="string">First name(s).</ResponseField>
+    <ResponseField name="apellidos" type="string">Last name(s).</ResponseField>
+    <ResponseField name="email" type="string">Email address.</ResponseField>
+    <ResponseField name="telefono" type="string">Phone number.</ResponseField>
+    <ResponseField name="activo" type="boolean">Whether the user account is active.</ResponseField>
+    <ResponseField name="creado_en" type="string">ISO 8601 creation timestamp.</ResponseField>
+    <ResponseField name="actualizado_en" type="string">ISO 8601 last-update timestamp.</ResponseField>
+  </Expandable>
+</ResponseField>
+
+---
+
+## POST /usuarios/register
+
+Registers a new user. The request body varies by role.
+
+**Authentication:** Required (admin).
+
+### Request body — common fields
+
+<ParamField body="nombres" type="string" required>
+  First name(s) of the new user.
+</ParamField>
+
+<ParamField body="apellidos" type="string" required>
+  Last name(s) of the new user.
+</ParamField>
+
+<ParamField body="email" type="string" required>
+  Email address. Must be unique across all users.
+</ParamField>
+
+<ParamField body="telefono" type="string">
+  Phone number.
+</ParamField>
+
+<ParamField body="rol_id" type="number" required>
+  The role to assign. References `roles.id`.
+</ParamField>
+
+### Request body — student-specific fields
+
+<ParamField body="fecha_nacimiento" type="string">
+  Date of birth in `YYYY-MM-DD` format. Required for students (`ALUMNO` role).
+</ParamField>
+
+### Request body — coordinator/professor-specific fields
+
+<ParamField body="especializacion" type="string">
+  Specialization or area of expertise. Used for professors and coordinators.
+</ParamField>
+
+<ParamField body="tarifa_hora" type="number">
+  Hourly rate as a decimal. Used for professors.
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean" required />
+<ResponseField name="data" type="object">
+  The newly created user object.
+</ResponseField>
+
+---
+
+## GET /usuarios/role/alumno
+
+Returns all users with the `ALUMNO` role.
+
+**Authentication:** Required (admin or coordinator).
+
+### Response
+
+<ResponseField name="success" type="boolean" required />
+<ResponseField name="data" type="object[]">
+  Array of student user objects.
+</ResponseField>
+
+---
+
+## GET /usuarios/role/coordinador
+
+Returns all users with the coordinator role.
+
+**Authentication:** Required (admin).
+
+### Response
+
+<ResponseField name="success" type="boolean" required />
+<ResponseField name="data" type="object[]">
+  Array of coordinator user objects.
+</ResponseField>
+
+---
+
+## GET /usuarios/role/profesor
+
+Returns all users with the `PROFESOR` role.
+
+**Authentication:** Required (admin or coordinator).
+
+### Response
+
+<ResponseField name="success" type="boolean" required />
+<ResponseField name="data" type="object[]">
+  Array of professor user objects.
+</ResponseField>
+
+---
+
+## GET /usuarios/:id
+
+Returns a single user by ID.
+
+**Authentication:** Required.
+
+### Path parameters
+
+<ParamField path="id" type="number" required>
+  The user ID to retrieve.
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean" required />
+<ResponseField name="data" type="object">
+  The user object.
+</ResponseField>
+
+---
+
+## PUT /usuarios/:id
+
+Updates a user's profile fields. Admins can update any user; users may update themselves via `PUT /auth/profile`.
+
+**Authentication:** Required (admin).
+
+### Path parameters
+
+<ParamField path="id" type="number" required>
+  The user ID to update.
+</ParamField>
+
+### Request body
+
+Send any subset of the registration fields you want to change.
+
+### Response
+
+<ResponseField name="success" type="boolean" required />
+<ResponseField name="data" type="object">
+  The updated user object.
+</ResponseField>
+
+---
+
+## DELETE /usuarios/:id
+
+Deactivates a user account (sets `activo = false`). Hard deletion is not performed.
+
+**Authentication:** Required (admin).
+
+### Path parameters
+
+<ParamField path="id" type="number" required>
+  The user ID to deactivate.
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean" required />
+<ResponseField name="message" type="string">
+  Confirmation message.
+</ResponseField>
+
+---
+
+## GET /usuarios/count/usuarios-stats
+
+Returns user count statistics used in the admin dashboard (total users, active users, counts per role, etc.).
+
+**Authentication:** Required (admin).
+
+### Response
+
+<ResponseField name="success" type="boolean" required />
+<ResponseField name="data" type="object">
+  Statistics object with counts per role and activity status.
+</ResponseField>
+
+---
+
+## GET /usuarios/reporte/detallado
+
+Returns a detailed user report suitable for Excel export. The frontend uses the `xlsx` package to convert this data into a spreadsheet.
+
+**Authentication:** Required (admin).
+
+### Response
+
+<ResponseField name="success" type="boolean" required />
+<ResponseField name="data" type="object[]">
+  Array of user objects with all profile fields expanded for reporting.
+</ResponseField>
+
+---
+
+## GET /alumnos
+
+Returns all students with their extended profile data from the `alumnos` table (emergency contact, medical conditions, date of birth).
+
+**Authentication:** Required (admin or coordinator).
+
+### Response
+
+<ResponseField name="success" type="boolean" required />
+<ResponseField name="data" type="object[]">
+  <Expandable title="student profile">
+    <ResponseField name="usuario_id" type="number">Student user ID (primary key).</ResponseField>
+    <ResponseField name="nombres" type="string">First name(s).</ResponseField>
+    <ResponseField name="apellidos" type="string">Last name(s).</ResponseField>
+    <ResponseField name="email" type="string">Email address.</ResponseField>
+    <ResponseField name="telefono" type="string">Phone number.</ResponseField>
+    <ResponseField name="contacto_emergencia_nombre" type="string">Emergency contact name.</ResponseField>
+    <ResponseField name="contacto_emergencia_telefono" type="string">Emergency contact phone.</ResponseField>
+    <ResponseField name="condiciones_medicas" type="string">Medical conditions (free text).</ResponseField>
+    <ResponseField name="fecha_nacimiento" type="string">Date of birth in `YYYY-MM-DD` format.</ResponseField>
+  </Expandable>
+</ResponseField>
+
+---
+
+## GET /alumno/mi-perfil
+
+Returns the full profile of the currently authenticated student.
+
+**Authentication:** Required (student).
+
+### Response
+
+<ResponseField name="success" type="boolean" required />
+<ResponseField name="data" type="object">
+  The student's own profile with all extended fields.
+</ResponseField>
+
+---
+
+## GET /alumno/gestion/resumen-cortes
+
+Returns the cut-day (día de corte) summary for coordinators. Shows payment cut-off status per student.
+
+**Authentication:** Required (coordinator or admin).
+
+### Response
+
+<ResponseField name="success" type="boolean" required />
+<ResponseField name="data" type="object[]">
+  Array of per-student cut-day summaries.
+</ResponseField>
+
+---
+
+## GET /coordinadores
+
+Returns all coordinators with their profile data.
+
+**Authentication:** Required (admin).
+
+### Response
+
+<ResponseField name="success" type="boolean" required />
+<ResponseField name="data" type="object[]">
+  Array of coordinator objects.
+</ResponseField>
+
+---
+
+## GET /coordinadores/:id
+
+Returns a single coordinator by ID.
+
+**Authentication:** Required (admin).
+
+### Path parameters
+
+<ParamField path="id" type="number" required>
+  The coordinator's user ID.
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean" required />
+<ResponseField name="data" type="object">
+  The coordinator object.
+</ResponseField>

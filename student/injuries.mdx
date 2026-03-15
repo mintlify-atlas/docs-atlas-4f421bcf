@@ -1,0 +1,79 @@
+---
+title: "Injury Management"
+description: "How to log an injury at Club Gema, view your request history, and understand how injuries relate to makeup sessions."
+---
+
+If you sustain an injury that prevents you from attending classes, you can submit an injury request. Approved requests allow you to freeze your missed classes and recover them without the normal makeup session limit.
+
+## Logging a new injury
+
+Go to `/dashboard/student/injuries`. The page opens on the **Nueva Solicitud** tab.
+
+<Steps>
+  <Step title="Describe the injury">
+    In the **Descripción del problema** field, explain what happened — what type of injury, when it occurred, and how it affects your training. This field is required.
+  </Step>
+  <Step title="Upload medical evidence">
+    Click the upload area to attach a photo of your medical certificate or documentation. Accepted formats: JPG, JPEG, PNG.
+
+    <Warning>
+      You must attach an image before submitting. The form will not submit without evidence (`evidencia` is required).
+    </Warning>
+  </Step>
+  <Step title="Submit the request">
+    Click **ENVIAR SOLICITUD**. The system posts a `multipart/form-data` request to `POST /lesiones` with:
+
+    ```text
+    descripcion   (string, required)
+    evidencia     (image file, required)
+    ```
+
+    A success toast **Solicitud enviada correctamente** confirms submission and the page switches to the **Historial** tab.
+  </Step>
+</Steps>
+
+<Info>
+  Injury requests are reviewed within 24 hours. You will see the result reflected in the status of the request on the Historial tab.
+</Info>
+
+## Viewing injury history
+
+Click the **Historial** tab to see all your submitted injury requests. Each card shows:
+
+| Field | Description |
+|---|---|
+| Status badge | `PENDIENTE`, `APROBADA`, or `RECHAZADA` |
+| `fecha_solicitud` | Date the request was submitted |
+| `descripcion_lesion` | Your description |
+| `notas_admin` | Notes added by the administrator when evaluating the request |
+| **Ver Evidencia** button | Link to the uploaded medical document (`url_evidencia_medica`) |
+
+Requests are fetched from `GET /lesiones/mis-solicitudes`.
+
+### Request statuses
+
+| Estado | Meaning |
+|---|---|
+| `PENDIENTE` | Submitted but not yet reviewed by an administrator |
+| `APROBADA` | Approved — recovery tickets without a limit are unlocked |
+| `RECHAZADA` | Rejected — the administrator may have added notes explaining why |
+
+## How injuries connect to recovery sessions
+
+When an injury request is **approved**, the system unlocks unlimited makeup sessions of type **Lesión** for the affected period. These appear as a separate counter on the Recovery page:
+
+- **Recuperaciones Normales** — limited per cycle (see [Recoveries](/student/recoveries))
+- **Recuperaciones por Lesión** — no limit, available when an injury is approved
+
+<Tip>
+  Submit your injury request as soon as possible after the injury occurs. Earlier submission means earlier review and faster access to unlimited recovery tickets.
+</Tip>
+
+<CardGroup cols={2}>
+  <Card title="Makeup Sessions" icon="rotate-ccw" href="/student/recoveries">
+    Learn how to schedule makeup sessions using your recovery tickets.
+  </Card>
+  <Card title="Attendance" icon="calendar-check" href="/student/attendance">
+    See how absences and justified statuses are tracked in your record.
+  </Card>
+</CardGroup>

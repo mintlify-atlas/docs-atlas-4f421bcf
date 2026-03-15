@@ -1,0 +1,121 @@
+---
+title: "Payment Management"
+description: "View and filter all payment records for Academia Gema. Understand payment statuses, methods, and the admin payment view."
+---
+
+The **Payment Management** module (`/dashboard/admin/payments`) is the main financial operations panel. It shows all payment reports submitted by students, with filtering by year, month, and validation status.
+
+## Fetching payment records
+
+The module uses the administrative payment endpoint:
+
+```http
+GET /pagos/gestion-admin
+```
+
+This returns enriched payment records with nested student information (`cuentas_por_cobrar.alumnos.usuarios`) and the payment method object (`metodos_pago`).
+
+---
+
+## Payment record fields
+
+| Field | Description |
+|---|---|
+| `id` | Payment record ID |
+| `codigo_operacion` | Transaction reference code from the student |
+| `monto_pagado` | Amount reported by the student (decimal) |
+| `fecha_pago` | Timestamp of the payment report |
+| `metodo_pago_id` | FK to `metodos_pago` |
+| `metodos_pago.nombre` | Payment method name: `YAPE`, `PLIN`, `TRANSFERENCIA`, `EFECTIVO` |
+| `estado_validacion` | Validation status: `PENDIENTE`, `APROBADO`, or `RECHAZADO` |
+| `url_comprobante` | Cloudinary URL of the uploaded voucher image |
+| `bloqueado_por_asistencia` | Boolean — true if the payment is blocked pending attendance recovery |
+| `notas_validacion` | Admin notes added during validation |
+| `cuentas_por_cobrar` | Nested `cuentas_por_cobrar` object with student and billing details |
+
+---
+
+## Filtering payments
+
+The payment list supports four simultaneous filters:
+
+| Filter | Options |
+|---|---|
+| **Year** | `2025`, `2026` (selector in the header) |
+| **Month** | All months, or a specific month (0-indexed) |
+| **Status** | Any, `PENDIENTE`, `APROBADO`, `RECHAZADO` |
+| **Search** | Student name or `codigo_operacion` |
+
+The default filter on page load is `statusFilter = 'PENDIENTE'`, showing only payments awaiting validation.
+
+---
+
+## Validation status meanings
+
+<Tabs>
+  <Tab title="PENDIENTE">
+    The student has submitted a payment report but the admin has not reviewed it yet. These are shown with an orange badge. The **Payment Validation** page is the workflow for processing these.
+  </Tab>
+  <Tab title="APROBADO">
+    The admin reviewed and approved the voucher. The linked `cuentas_por_cobrar` record is updated to `PAGADO` (or `PARCIAL` if only a partial amount was confirmed).
+  </Tab>
+  <Tab title="RECHAZADO">
+    The admin rejected the payment report. The `cuentas_por_cobrar` status remains unchanged. The student must re-submit a corrected report.
+  </Tab>
+</Tabs>
+
+---
+
+## Cuentas por cobrar statuses
+
+The `cuentas_por_cobrar` table tracks billing obligations. Each record has one of the following statuses:
+
+| Status | Meaning |
+|---|---|
+| `PENDIENTE` | Payment is due and not yet received |
+| `PARCIAL` | A partial payment has been confirmed |
+| `PAGADO` | Full payment has been confirmed |
+| `VENCIDO` | Payment was not received by `fecha_vencimiento` |
+| `CANCELADO` | The billing obligation was manually cancelled |
+
+---
+
+## Payment methods
+
+The four payment methods configured in the system:
+
+| ID | Name |
+|---|---|
+| 1 | YAPE |
+| 2 | PLIN |
+| 3 | TRANSFERENCIA |
+| 4 | EFECTIVO |
+
+These are managed via `GET /metodos-pago` and `PUT /metodos-pago/:id`. Active methods (`activo = true`) appear in the student payment form and the guest pass form.
+
+---
+
+## Blocked payments
+
+A payment card displays an orange **BLOQUEADO POR ASISTENCIA** banner when `bloqueado_por_asistencia = true`. This means the student has unresolved recovery sessions (`recuperaciones`) that must be processed before the payment can be validated.
+
+---
+
+## Per-student payment history
+
+To fetch the full payment history for a specific student:
+
+```http
+GET /pagos/alumno/:id
+```
+
+This is also accessible from the student's profile in the **Students** module via the Payment History tab.
+
+---
+
+## Payment statistics widget
+
+Above the payment list, the `AdminPaymentStats` component renders:
+
+- **Por Validar** counter — total payments with `estado_validacion = 'PENDIENTE'` in the selected year
+- **Análisis Mensual de Ingresos Reales** — a bar chart of monthly approved income with a peak indicator (`S/ n,nnn`)

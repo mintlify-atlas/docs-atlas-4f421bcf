@@ -1,0 +1,83 @@
+---
+title: "Coordinator Overview"
+description: "An introduction to the Coordinador role in Academia Gema — your dashboard layout, navigation, and available tools."
+---
+
+## What is a Coordinador?
+
+A **Coordinador** (coordinator) is the instructor who leads volleyball training sessions at Academia Gema. Your role centers on three core responsibilities:
+
+- **Taking attendance** — recording each athlete's presence or absence at every scheduled session
+- **Monitoring billing cycles** — reviewing the cut day (`Día de Corte`) report to identify students with overdue payments
+- **Maintaining your profile** — keeping your contact details and specialization up to date
+
+In the database, coordinators are stored in the `profesores` table (linked to `usuarios` via `usuario_id`) and have a dedicated `especializacion` field. Your name appears on every class card shown to enrolled students.
+
+---
+
+## Dashboard Layout
+
+The coordinator interface uses the `TeacherLayout`, which is intentionally minimal compared to the admin or student layouts. It consists of:
+
+| Region | Description |
+|--------|-------------|
+| **Left sidebar** (desktop) | Fixed 256 px navigation panel with the Gema Coordinator branding |
+| **Top header** (desktop) | Displays your full name and role badge (`Coordinador`) |
+| **Main content area** | Light slate background (`#f1f5f9`) where each page loads |
+| **Mobile bottom navbar** | `MobileNavbarTeacher` bar for handheld devices |
+
+All coordinator routes are prefixed with `/dashboard/teacher/`.
+
+---
+
+## Navigation
+
+The sidebar exposes exactly three navigation items:
+
+<CardGroup cols={3}>
+  <Card title="Mis Clases" icon="clipboard-list" href="/coordinator/attendance">
+    Your training agenda. Take or review attendance for any scheduled session. Route: `/dashboard/teacher`
+  </Card>
+  <Card title="Mi Perfil" icon="user" href="/coordinator/profile">
+    Edit your personal and professional data. Route: `/dashboard/teacher/profile`
+  </Card>
+  <Card title="Días de Corte" icon="calendar" href="/coordinator/cutday">
+    View the 30-day billing cycle cut report for all students. Route: `/dashboard/teacher/DiaCorte`
+  </Card>
+</CardGroup>
+
+---
+
+## Quick-Access Summary
+
+<Steps>
+  <Step title="Open your agenda">
+    Go to **Mis Clases** (`/dashboard/teacher`). The page loads every session assigned to you — past, present, and future — sorted chronologically. Today's session is highlighted in orange and auto-scrolled into view.
+  </Step>
+  <Step title="Take attendance">
+    Click **TOMAR ASISTENCIA** on the current session's card to open the attendance modal. Mark each athlete and save the entire group in one action.
+  </Step>
+  <Step title="Check the cut day report">
+    Navigate to **Días de Corte** to see which students' 30-day billing cycle has expired. Pass this information to the administration team so they can follow up on payments.
+  </Step>
+  <Step title="Keep your profile current">
+    Visit **Mi Perfil** to update your `especializacion`, phone number, or email. Your display name is pulled directly from your profile and shown on class cards.
+  </Step>
+</Steps>
+
+---
+
+## Role Permissions
+
+<Note>
+  Coordinators can only view and modify data scoped to their own sessions and profile. You do **not** have access to the admin panel, payment processing, or student enrollment management — those actions are reserved for the `ADMIN` role.
+</Note>
+
+| Feature | Coordinador | Admin |
+|---------|:-----------:|:-----:|
+| Take / view attendance | ✓ | ✓ |
+| View cut day report | ✓ | ✓ |
+| Edit own profile | ✓ | ✓ |
+| Manage students / schedules | ✗ | ✓ |
+| Validate payments | ✗ | ✓ |
+| Reschedule classes (mass) | ✗ | ✓ |

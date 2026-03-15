@@ -1,0 +1,145 @@
+---
+title: Financial schema
+description: Full schema for accounts receivable, payments, performance indexes, and the timestamp trigger function.
+---
+
+The financial layer consists of two tables: `cuentas_por_cobrar` (accounts receivable, representing charges) and `pagos` (payments applied against those charges). Admins generate accounts; students report payments; admins validate them.
+
+---
+
+## cuentas_por_cobrar
+
+Represents a charge issued to a student — typically a monthly tuition fee.
+
+```sql
+CREATE TABLE cuentas_por_cobrar (
+    id SERIAL PRIMARY KEY,
+    alumno_id INT NOT NULL REFERENCES alumnos(usuario_id),
+    concepto VARCHAR(150) NOT NULL,
+    monto DECIMAL(10, 2) NOT NULL,
+    fecha_vencimiento DATE NOT NULL,
+    estado VARCHAR(20) DEFAULT 'PENDIENTE'
+        CHECK (estado IN ('PENDIENTE', 'PARCIAL', 'PAGADO', 'VENCIDO', 'CANCELADO')),
+    creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    actualizado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| `id` | `SERIAL` | `PRIMARY KEY` | Auto-incrementing account ID. |
+| `alumno_id` | `INT` | `NOT NULL, FK → alumnos.usuario_id` | The student being charged. Indexed by `idx_cuentas_alumno`. |
+| `concepto` | `VARCHAR(150)` | `NOT NULL` | Description of the charge (e.g. `Mensualidad Julio 2025`). |
+| `monto` | `DECIMAL(10, 2)` | `NOT NULL` | Total amount charged. |
+| `fecha_vencimiento` | `DATE` | `NOT NULL` | Due date. Used together with `estado` in `idx_cuentas_estado_fecha`. |
+| `estado` | `VARCHAR(20)` | `DEFAULT 'PENDIENTE'` | Payment state. See status lifecycle below. |
+| `creado_en` | `TIMESTAMP` | `DEFAULT CURRENT_TIMESTAMP` | When the account was created. |
+| `actualizado_en` | `TIMESTAMP` | `DEFAULT CURRENT_TIMESTAMP` | Last status change. Maintained by the `trg_actualizar_cuentas` trigger. |
+
+### Status lifecycle
+
+| Status | Meaning |
+|---|---|
+| `PENDIENTE` | The charge has been issued and no payment has been received. |
+| `PARCIAL` | A payment has been reported but does not cover the full amount. |
+| `PAGADO` | The full amount has been paid and validated. |
+| `VENCIDO` | The due date has passed and the balance is unpaid. |
+| `CANCELADO` | The charge has been cancelled by an admin. |
+
+---
+
+## pagos
+
+Records individual payment transactions applied against an account receivable.
+
+```sql
+CREATE TABLE pagos (
+    id SERIAL PRIMARY KEY,
+    cuenta_id INT NOT NULL REFERENCES cuentas_por_cobrar(id),
+    monto_pagado DECIMAL(10, 2) NOT NULL,
+    fecha_pago TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    metodo_pago VARCHAR(50) NOT NULL,
+    referencia_transaccion VARCHAR(100)
+);
+```
+
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| `id` | `SERIAL` | `PRIMARY KEY` | Auto-incrementing payment ID. |
+| `cuenta_id` | `INT` | `NOT NULL, FK → cuentas_por_cobrar.id` | The account this payment is applied to. |
+| `monto_pagado` | `DECIMAL(10, 2)` | `NOT NULL` | Amount paid in this transaction. |
+| `fecha_pago` | `TIMESTAMP` | `DEFAULT CURRENT_TIMESTAMP` | When the payment was recorded. |
+| `metodo_pago` | `VARCHAR(50)` | `NOT NULL` | Payment method (e.g. `Transferencia`, `Efectivo`, `Yape`). |
+| `referencia_transaccion` | `VARCHAR(100)` | | Voucher number or transaction reference code. |
+
+---
+
+## Performance indexes
+
+All indexes are defined in `clubGema.sql` and created after the tables.
+
+```sql
+CREATE INDEX idx_usuarios_email      ON usuarios(email);
+CREATE INDEX idx_usuarios_apellidos  ON usuarios(apellidos);
+CREATE INDEX idx_inscripciones_alumno  ON inscripciones(alumno_id);
+CREATE INDEX idx_inscripciones_horario ON inscripciones(horario_id);
+CREATE INDEX idx_asistencia_inscripcion ON registros_asistencia(inscripcion_id);
+CREATE INDEX idx_cuentas_alumno      ON cuentas_por_cobrar(alumno_id);
+CREATE INDEX idx_cuentas_estado_fecha ON cuentas_por_cobrar(estado, fecha_vencimiento);
+CREATE INDEX idx_direcciones_ciudad  ON direcciones(ciudad);
+```
+
+| Index | Table | Column(s) | Purpose |
+|---|---|---|---|
+| `idx_usuarios_email` | `usuarios` | `email` | Fast user lookup on login. |
+| `idx_usuarios_apellidos` | `usuarios` | `apellidos` | User search by last name in admin lists. |
+| `idx_inscripciones_alumno` | `inscripciones` | `alumno_id` | Retrieve all enrollments for a student. |
+| `idx_inscripciones_horario` | `inscripciones` | `horario_id` | Retrieve all students in a given schedule. |
+| `idx_asistencia_inscripcion` | `registros_asistencia` | `inscripcion_id` | Retrieve attendance history for an enrollment. |
+| `idx_cuentas_alumno` | `cuentas_por_cobrar` | `alumno_id` | Retrieve all charges for a student. |
+| `idx_cuentas_estado_fecha` | `cuentas_por_cobrar` | `estado, fecha_vencimiento` | Efficiently query overdue or pending accounts. |
+| `idx_direcciones_ciudad` | `direcciones` | `ciudad` | Search venues by city. |
+
+---
+
+## Timestamp trigger
+
+A single PostgreSQL function and three triggers keep `actualizado_en` current automatically.
+
+### Function
+
+```sql
+CREATE OR REPLACE FUNCTION actualizar_columna_timestamp()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.actualizado_en = NOW();
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+```
+
+### Triggers
+
+```sql
+CREATE TRIGGER trg_actualizar_usuarios
+    BEFORE UPDATE ON usuarios
+    FOR EACH ROW EXECUTE PROCEDURE actualizar_columna_timestamp();
+
+CREATE TRIGGER trg_actualizar_cuentas
+    BEFORE UPDATE ON cuentas_por_cobrar
+    FOR EACH ROW EXECUTE PROCEDURE actualizar_columna_timestamp();
+
+CREATE TRIGGER trg_actualizar_inscripciones
+    BEFORE UPDATE ON inscripciones
+    FOR EACH ROW EXECUTE PROCEDURE actualizar_columna_timestamp();
+```
+
+| Trigger | Table | Event |
+|---|---|---|
+| `trg_actualizar_usuarios` | `usuarios` | `BEFORE UPDATE` |
+| `trg_actualizar_cuentas` | `cuentas_por_cobrar` | `BEFORE UPDATE` |
+| `trg_actualizar_inscripciones` | `inscripciones` | `BEFORE UPDATE` |
+
+<Tip>
+  Because these triggers fire automatically, you should never include `actualizado_en` in your `UPDATE` statements. The database sets it for you.
+</Tip>

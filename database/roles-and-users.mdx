@@ -1,0 +1,147 @@
+---
+title: Roles and users schema
+description: Full schema for the roles, usuarios, credenciales_usuario, alumnos, and profesores tables that form the identity layer.
+---
+
+User identity in Academia Gema follows a core-plus-extension pattern. The `usuarios` table holds every user regardless of role. Role-specific data lives in separate extension tables (`alumnos`, `profesores`) that share the same primary key as `usuarios`.
+
+## Role assignment flow
+
+<Steps>
+  <Step title="A role is assigned">
+    When creating a user, an admin supplies a `rol_id` that references the `roles` table. The three built-in roles are `ADMIN`, `PROFESOR`, and `ALUMNO`.
+  </Step>
+  <Step title="Core user record is created">
+    A row is inserted into `usuarios` with the `rol_id` and the shared profile fields (name, email, phone).
+  </Step>
+  <Step title="Credentials are stored">
+    A row is inserted into `credenciales_usuario` with the hashed password. The `usuario_id` column is both the primary key and a foreign key back to `usuarios`.
+  </Step>
+  <Step title="Role profile is extended">
+    For `ALUMNO` users a row is inserted into `alumnos`. For `PROFESOR` users a row is inserted into `profesores`. `ADMIN` users have no extension table.
+  </Step>
+</Steps>
+
+---
+
+## roles
+
+Defines the three roles in the system.
+
+```sql
+CREATE TABLE roles (
+    id SERIAL PRIMARY KEY,
+    nombre VARCHAR(50) UNIQUE NOT NULL -- 'ADMIN', 'PROFESOR', 'ALUMNO'
+);
+```
+
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| `id` | `SERIAL` | `PRIMARY KEY` | Auto-incrementing role ID. |
+| `nombre` | `VARCHAR(50)` | `UNIQUE NOT NULL` | Role name. Expected values: `ADMIN`, `PROFESOR`, `ALUMNO`. |
+
+---
+
+## usuarios
+
+The central user record. Every person in the system has exactly one row here.
+
+```sql
+CREATE TABLE usuarios (
+    id SERIAL PRIMARY KEY,
+    rol_id INT NOT NULL REFERENCES roles(id),
+    nombres VARCHAR(100) NOT NULL,
+    apellidos VARCHAR(100) NOT NULL,
+    email VARCHAR(150) UNIQUE NOT NULL,
+    telefono VARCHAR(20),
+    activo BOOLEAN DEFAULT TRUE,
+    creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    actualizado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| `id` | `SERIAL` | `PRIMARY KEY` | Auto-incrementing user ID. Returned as `user_id` in the auth cookies. |
+| `rol_id` | `INT` | `NOT NULL, FK → roles.id` | The user's role. |
+| `nombres` | `VARCHAR(100)` | `NOT NULL` | First name(s). Stored in the `user_name` cookie on login. |
+| `apellidos` | `VARCHAR(100)` | `NOT NULL` | Last name(s). Stored in the `user_lastname` cookie on login. |
+| `email` | `VARCHAR(150)` | `UNIQUE NOT NULL` | Email address. Indexed by `idx_usuarios_email`. |
+| `telefono` | `VARCHAR(20)` | | Phone number. Optional. |
+| `activo` | `BOOLEAN` | `DEFAULT TRUE` | `FALSE` when an account has been deactivated via `DELETE /usuarios/:id`. |
+| `creado_en` | `TIMESTAMP` | `DEFAULT CURRENT_TIMESTAMP` | Account creation time. |
+| `actualizado_en` | `TIMESTAMP` | `DEFAULT CURRENT_TIMESTAMP` | Last update time. Maintained automatically by the `trg_actualizar_usuarios` trigger. |
+
+<Note>
+  The `trg_actualizar_usuarios` trigger runs `BEFORE UPDATE` and sets `actualizado_en = NOW()` automatically. You never need to supply this value in update requests.
+</Note>
+
+---
+
+## credenciales_usuario
+
+Stores authentication credentials separately from profile data.
+
+```sql
+CREATE TABLE credenciales_usuario (
+    usuario_id INT PRIMARY KEY REFERENCES usuarios(id) ON DELETE CASCADE,
+    hash_contrasena VARCHAR(255) NOT NULL,
+    ultimo_login TIMESTAMP,
+    intentos_fallidos INT DEFAULT 0,
+    bloqueado BOOLEAN DEFAULT FALSE,
+    contrasena_actualizada_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| `usuario_id` | `INT` | `PRIMARY KEY, FK → usuarios.id CASCADE` | Same ID as `usuarios.id`. Deleting a user also deletes their credentials. |
+| `hash_contrasena` | `VARCHAR(255)` | `NOT NULL` | Bcrypt hash of the user's password. Never exposed via the API. |
+| `ultimo_login` | `TIMESTAMP` | | Updated on every successful login. |
+| `intentos_fallidos` | `INT` | `DEFAULT 0` | Count of consecutive failed login attempts. |
+| `bloqueado` | `BOOLEAN` | `DEFAULT FALSE` | Set to `TRUE` when the account is locked after too many failures. |
+| `contrasena_actualizada_en` | `TIMESTAMP` | `DEFAULT CURRENT_TIMESTAMP` | Timestamp of the last password change via `POST /auth/change-password`. |
+
+---
+
+## alumnos
+
+Extends `usuarios` with student-specific fields.
+
+```sql
+CREATE TABLE alumnos (
+    usuario_id INT PRIMARY KEY REFERENCES usuarios(id),
+    contacto_emergencia_nombre VARCHAR(100),
+    contacto_emergencia_telefono VARCHAR(20),
+    condiciones_medicas TEXT,
+    fecha_nacimiento DATE
+);
+```
+
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| `usuario_id` | `INT` | `PRIMARY KEY, FK → usuarios.id` | Shared primary key with `usuarios`. |
+| `contacto_emergencia_nombre` | `VARCHAR(100)` | | Name of the emergency contact person. |
+| `contacto_emergencia_telefono` | `VARCHAR(20)` | | Emergency contact phone number. |
+| `condiciones_medicas` | `TEXT` | | Free-text field for medical conditions or notes. |
+| `fecha_nacimiento` | `DATE` | | Student's date of birth. |
+
+---
+
+## profesores
+
+Extends `usuarios` with professor-specific fields.
+
+```sql
+CREATE TABLE profesores (
+    usuario_id INT PRIMARY KEY REFERENCES usuarios(id),
+    especializacion VARCHAR(100),
+    tarifa_hora DECIMAL(10, 2)
+);
+```
+
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| `usuario_id` | `INT` | `PRIMARY KEY, FK → usuarios.id` | Shared primary key with `usuarios`. |
+| `especializacion` | `VARCHAR(100)` | | Specialization or coaching focus area. |
+| `tarifa_hora` | `DECIMAL(10, 2)` | | Hourly rate charged by the professor. |

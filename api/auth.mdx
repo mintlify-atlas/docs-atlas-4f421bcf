@@ -1,0 +1,238 @@
+---
+title: Authentication API
+description: Endpoints for login, logout, password management, profile updates, email completion, and JWT token refresh.
+---
+
+All authentication endpoints live under the `/auth` prefix. Login and refresh use `credentials: "include"` so the browser sends and receives HTTP-only JWT cookies. All other authenticated endpoints also require `credentials: "include"`.
+
+---
+
+## POST /auth/login
+
+Authenticates a user and creates a session. On success the server sets an HTTP-only JWT cookie; the client additionally writes `user_role`, `user_name`, `user_lastname`, and `user_id` cookies for UI use.
+
+**Authentication:** None required.
+
+### Request body
+
+<ParamField body="username" type="string" required>
+  The user's username or email address used to identify the account.
+</ParamField>
+
+<ParamField body="password" type="string" required>
+  The user's password in plain text. Transmitted over HTTPS only.
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean" required>
+  `true` when authentication succeeded.
+</ResponseField>
+
+<ResponseField name="data" type="object">
+  <Expandable title="properties">
+    <ResponseField name="user" type="object">
+      <Expandable title="properties">
+        <ResponseField name="id" type="number">
+          The user's numeric ID, also written to the `user_id` cookie.
+        </ResponseField>
+        <ResponseField name="nombres" type="string">
+          First name(s), written to the `user_name` cookie.
+        </ResponseField>
+        <ResponseField name="apellidos" type="string">
+          Last name(s), written to the `user_lastname` cookie.
+        </ResponseField>
+        <ResponseField name="rol" type="string">
+          Role string (`ADMIN`, `PROFESOR`, `ALUMNO`), written to the `user_role` cookie.
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  Human-readable result message.
+</ResponseField>
+
+```javascript
+const response = await fetch(`${API_URL}/auth/login`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ username: 'jdoe', password: 'secret' }),
+  credentials: 'include',
+});
+const result = await response.json();
+// result.data.user.rol => 'ALUMNO'
+```
+
+---
+
+## POST /auth/logout
+
+Ends the user's session. The server invalidates the HTTP-only JWT cookie. The client removes all session cookies (`user_role`, `user_name`, `user_lastname`, `user_id`) and the localStorage keys `auth_sync`, `logout_sync`, and `last_viewed_news`, then redirects to `/login`.
+
+**Authentication:** Required (send `credentials: "include"`).
+
+### Response
+
+Returns `200 OK`. The client-side service handles the redirect regardless of the server response.
+
+---
+
+## POST /auth/forgot-password
+
+Sends a password reset email to the specified address.
+
+**Authentication:** None required.
+
+### Request body
+
+<ParamField body="email" type="string" required>
+  The email address associated with the account.
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean" required>
+  `true` when the reset email was dispatched.
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  Confirmation or error message.
+</ResponseField>
+
+---
+
+## POST /auth/reset-password
+
+Resets the user's password using a token received by email.
+
+**Authentication:** None required.
+
+### Request body
+
+<ParamField body="token" type="string" required>
+  The password reset token delivered in the email link.
+</ParamField>
+
+<ParamField body="newPassword" type="string" required>
+  The new password to set for the account.
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean" required>
+  `true` when the password was updated successfully.
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  Confirmation or error message.
+</ResponseField>
+
+---
+
+## POST /auth/change-password
+
+Allows an authenticated user to change their own password.
+
+**Authentication:** Required.
+
+### Request body
+
+<ParamField body="currentPassword" type="string" required>
+  The user's current password for verification.
+</ParamField>
+
+<ParamField body="newPassword" type="string" required>
+  The new password to set.
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean" required>
+  `true` when the password was changed.
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  Confirmation or error message.
+</ResponseField>
+
+---
+
+## PUT /auth/profile
+
+Updates the authenticated user's profile fields.
+
+**Authentication:** Required.
+
+### Request body
+
+Send any subset of profile fields you want to update. The exact accepted fields depend on the user's role.
+
+<ParamField body="nombres" type="string">
+  Updated first name(s).
+</ParamField>
+
+<ParamField body="apellidos" type="string">
+  Updated last name(s).
+</ParamField>
+
+<ParamField body="telefono" type="string">
+  Updated phone number.
+</ParamField>
+
+<ParamField body="email" type="string">
+  Updated email address.
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean" required>
+  `true` when the profile was updated.
+</ResponseField>
+
+<ResponseField name="data" type="object">
+  The updated user object.
+</ResponseField>
+
+---
+
+## POST /auth/completar-email
+
+Completes the email address for accounts that were created without one (e.g. via username-only registration).
+
+**Authentication:** Required.
+
+### Request body
+
+<ParamField body="email" type="string" required>
+  The email address to associate with the account.
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean" required>
+  `true` when the email was saved.
+</ResponseField>
+
+<ResponseField name="data" type="object">
+  The updated user record.
+</ResponseField>
+
+---
+
+## GET /auth/refresh
+
+Refreshes the JWT token using the existing HTTP-only refresh cookie. Called automatically by the `apiFetch` interceptor when any request returns `401`.
+
+**Authentication:** Requires a valid refresh cookie (send `credentials: "include"`).
+
+### Response
+
+<ResponseField name="success" type="boolean" required>
+  `true` when a new JWT was issued.
+</ResponseField>
+
+<Note>
+  You should not call this endpoint directly. The `apiFetch` interceptor in `src/interceptors/api.js` handles token refresh automatically.
+</Note>

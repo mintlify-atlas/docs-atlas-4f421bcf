@@ -1,0 +1,138 @@
+---
+title: "System Settings"
+description: "Configure system parameters that control billing cycles, payment methods, and other core platform behavior."
+---
+
+The **System Settings** panel (`/dashboard/admin/settings`) is the configuration interface for the `parametros` table — a key-value store of operational settings that affect platform-wide behavior.
+
+<Warning>
+  Changes to these parameters directly impact the billing engine, attendance calculations, and payment processing. Edit with care and verify the impact before saving.
+</Warning>
+
+## Viewing system parameters
+
+All parameters load from:
+
+```http
+GET /parametros
+```
+
+Each parameter is displayed as a card with:
+- A contextual icon (wallet for payment settings, calendar for date settings, bell for notification settings, etc.)
+- The `clave` (key name) — a short technical identifier like `DIA_CORTE_PAGO` or `LIMITE_AUSENCIAS`
+- The `descripcion` — a human-readable explanation of what the parameter controls
+- The current `valor` (value)
+- An edit button
+
+Parameters are displayed in a 3-column grid.
+
+---
+
+## Editing a parameter
+
+<Steps>
+  <Step title="Click the edit icon">
+    Click the pencil icon on the parameter card you want to change. The card expands into an inline edit form with an orange accent.
+  </Step>
+  <Step title="Update the value">
+    Type the new value in the input field. The field is pre-filled with the current `valor`.
+  </Step>
+  <Step title="Confirm">
+    Click **Confirmar**. The change is sent to:
+
+    ```http
+    PUT /parametros/:id
+    Content-Type: application/json
+
+    { "valor": "10" }
+    ```
+
+    A success toast confirms the save. Click the **X** button to cancel without saving.
+  </Step>
+</Steps>
+
+---
+
+## Icon mapping by parameter type
+
+The admin panel assigns icons automatically based on the parameter key name:
+
+| Pattern in key | Icon | Color |
+|---|---|---|
+| `PAGO`, `PRECIO` | Wallet | Green |
+| `TEMPORADA`, `FECHA` | Calendar | Blue |
+| `NOTIF`, `AVISO` | Bell | Orange |
+| `SEGURIDAD`, `AUTH` | ShieldCheck | Indigo |
+| `SISTEMA`, `DB` | Database | Slate |
+| Any other | Zap | Yellow |
+
+---
+
+## Payment methods configuration
+
+Payment methods are separate from system parameters and are managed via:
+
+```http
+GET /metodos-pago
+```
+
+The four default methods are:
+
+| ID | Name | Notes |
+|---|---|---|
+| 1 | YAPE | Mobile payment |
+| 2 | PLIN | Mobile payment |
+| 3 | TRANSFERENCIA | Bank transfer |
+| 4 | EFECTIVO | Cash |
+
+Payment methods with `activo = false` are hidden from:
+- The student payment reporting form
+- The guest pass (Taquilla Express) payment selector
+- The admin dashboard payment channel chart
+
+To update a payment method:
+
+```http
+PUT /metodos-pago/:id
+Content-Type: application/json
+
+{ "activo": false }
+```
+
+---
+
+## What parameters affect
+
+<Accordion title="Billing and cut dates">
+  Parameters with keys containing `PAGO`, `PRECIO`, or `FECHA` typically control when monthly billing records (`cuentas_por_cobrar`) are generated and when they become `VENCIDO`. Changing the cut date (`DIA_CORTE`) affects all future billing cycles.
+</Accordion>
+
+<Accordion title="Attendance thresholds">
+  Parameters controlling absence limits or attendance percentages affect when a student's enrollment status changes to `SUSPENDIDO` or when payments are blocked (`bloqueado_por_asistencia = true`).
+</Accordion>
+
+<Accordion title="Notification settings">
+  Parameters with `NOTIF` or `AVISO` in their key control whether push notifications are sent for payment reminders, class reschedules, and injury updates.
+</Accordion>
+
+---
+
+## API reference
+
+```http
+# List all parameters
+GET /parametros
+
+# Update a parameter
+PUT /parametros/:id
+Content-Type: application/json
+{ "valor": "<new_value>" }
+
+# Payment methods
+GET /metodos-pago
+PUT /metodos-pago/:id
+```
+
+<Info>
+  The settings page displays all parameters returned by `GET /parametros`. There is no create or delete action in the UI — the parameter list is fixed and managed at the database level.
+</Info>

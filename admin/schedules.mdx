@@ -1,0 +1,127 @@
+---
+title: "Schedule Management"
+description: "Create and manage weekly class schedules, including assigning sedes, canchas, coordinators, and levels. Covers mass rescheduling and holiday management."
+---
+
+The **Schedule Management** panel (`/dashboard/admin/schedules`) is where you define every recurring class slot in the academy. Each schedule record in the `horarios_clases` table represents one weekly class with a fixed day, time, court, coordinator, and training level.
+
+## Viewing existing schedules
+
+Schedules load from `GET /horarios`. Results are paginated at **6 cards per page** and can be filtered by:
+
+- **Day of week** (Lunes through Domingo)
+- **Sede** (derived from `cancha.sede.nombre`)
+- **Coordinator** (derived from `coordinador.nombre_completo`)
+- **Search term** — matches coordinator name or cancha name
+
+Each card shows the time range, training level, coordinator, and court+sede.
+
+---
+
+## Creating a class schedule
+
+<Steps>
+  <Step title="Click 'Programar Clase'">
+    From the schedule list, click the **Programar Clase** button in the top-right corner.
+  </Step>
+  <Step title="Select the space">
+    Choose a **Sede** first. Once a sede is selected, its **canchas** load automatically from `GET /sedes/:id`. Then pick the cancha where the class will be held.
+  </Step>
+  <Step title="Assign coordinator and level">
+    Select a **Coordinador** from the dropdown (populated by `GET /usuarios/role/coordinador`) and a **Nivel** from `GET /niveles`.
+  </Step>
+  <Step title="Set capacity">
+    Enter the `capacidad_max` (maximum students). Defaults to `20`.
+  </Step>
+  <Step title="Add time blocks">
+    Add one or more time blocks. Each block requires:
+
+    | Field | Values |
+    |---|---|
+    | `dia_semana` | `1` = Lunes, `2` = Martes, ..., `7` = Domingo |
+    | `hora_inicio` | Time in `HH:MM` format |
+    | `hora_fin` | Time in `HH:MM` format |
+
+    Click the **+** button to add multiple blocks in a single submission.
+  </Step>
+  <Step title="Submit">
+    Click **Finalizar Programación**. Each block generates one `POST /horarios` request:
+
+    ```http
+    POST /horarios
+    Content-Type: application/json
+
+    {
+      "cancha_id": 3,
+      "coordinador_id": 7,
+      "nivel_id": 2,
+      "capacidad_max": 15,
+      "dia_semana": 1,
+      "hora_inicio": "09:00",
+      "hora_fin": "10:30"
+    }
+    ```
+  </Step>
+</Steps>
+
+---
+
+## Unique constraint
+
+The database enforces:
+
+```sql
+CONSTRAINT unica_cancha_hora UNIQUE (cancha_id, dia_semana, hora_inicio)
+```
+
+This means **no two classes can share the same court on the same day at the same start time**. If you try to create a conflicting schedule, the API returns an error. To move a class to a different court at the same time, you must first delete or edit the existing one.
+
+---
+
+## Editing and deleting schedules
+
+- **Edit**: Click the pencil icon on a schedule card. The same form loads pre-filled with the current data. Changes are sent to `PUT /horarios/:id`.
+- **Delete**: Click the trash icon. A confirmation dialog appears. Confirmed deletes call `DELETE /horarios/:id`.
+
+<Warning>
+  Deleting a schedule removes all future class sessions generated from it. Students enrolled in that schedule lose their upcoming attendance slots. Review enrollments before deleting.
+</Warning>
+
+---
+
+## Activating and deactivating schedules
+
+Schedules have an `activo` boolean. Inactive schedules are excluded from the public schedule browser and from the guest pass dropdown. Update the field via:
+
+```http
+PUT /horarios/:id
+Content-Type: application/json
+
+{ "activo": false }
+```
+
+---
+
+## Mass rescheduling
+
+For situations like venue closures or national holidays, use the **Reprogramación Masiva** tool instead of editing individual records. See [Mass Reschedules](/admin/reschedules) for the full workflow, including:
+
+- `POST /clases/reprogramar-masivo` — reschedule all classes on a given date
+- `POST /clases/revertir-masivo` — revert a mass reschedule
+- `GET /clases/reprogramaciones-masivas-activas` — list active batch reschedules
+
+---
+
+## Holiday management
+
+Holidays registered via `POST /feriados` prevent attendance from being recorded on those dates. From the Reschedules page, click **Gestionar Calendario** to open the feriados panel where you can list, add, and delete holiday dates.
+
+```http
+POST /feriados
+Content-Type: application/json
+
+{
+  "fecha": "2026-07-28",
+  "descripcion": "Fiestas Patrias"
+}
+```

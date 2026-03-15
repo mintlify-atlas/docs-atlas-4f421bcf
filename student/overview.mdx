@@ -1,0 +1,84 @@
+---
+title: "Student Dashboard Overview"
+description: "A complete guide to the Academia Gema student dashboard — what each section does and how to navigate it."
+---
+
+When you log in as a student (Alumno), you land at `/dashboard/student`. This is your central hub for everything related to your membership at Club Gema.
+
+## What's on the dashboard
+
+The home screen loads four sets of data in parallel and displays them in one view:
+
+| Section | What you see |
+|---|---|
+| **Header** | Your first name, a notification bell with an unread count, and your avatar initial |
+| **Benefits carousel** | Rotating cards for Recovery, Referrals, and Injury management — auto-advances every 6 seconds |
+| **Stats bar** | Your real attendance percentage and total missed sessions for the current cycle |
+| **Weekly timeline** | A visual block-schedule of your classes for the current week |
+| **Schedule grid** | Filterable list of all your attendance records (filter by month and year) |
+| **Payments panel** | Outstanding debts and recent payment reports side by side |
+
+### Attendance stats
+
+The two stat cards at the top of the main area pull from `GET /asistencias/alumno/:id/estadisticas`:
+
+- **Asistencia Real** — your attendance percentage. Displays in red when below 50%.
+- **Faltas Totales** — total missed sessions in the current cycle.
+
+### Notifications
+
+The bell icon in the header shows a live unread count, polled every 5 minutes from `GET /notificaciones/conteo-no-leidas`. Clicking the bell opens a dropdown that splits notifications into **Nuevas** (unread) and **Anteriores** (read). Clicking an unread notification marks it as read via `PATCH /notificaciones/:id/leer`.
+
+## Navigation
+
+<CardGroup cols={2}>
+  <Card title="Home" icon="house" href="/student/overview">
+    Main dashboard with stats, weekly timeline, schedule, and payments summary.
+  </Card>
+  <Card title="My Registrations" icon="list-check" href="/student/enrollment">
+    View and manage all your current and past class enrollments.
+  </Card>
+  <Card title="Enrollment" icon="calendar-plus" href="/student/enrollment">
+    Browse available schedules and enroll in new class slots.
+  </Card>
+  <Card title="Payments" icon="credit-card" href="/student/payments">
+    View outstanding accounts and report payments to administration.
+  </Card>
+  <Card title="Profile" icon="user" href="/student/overview">
+    Edit your personal details, emergency contact, and change your password.
+  </Card>
+  <Card title="Injuries" icon="heart-pulse" href="/student/injuries">
+    Log an injury and view your injury request history.
+  </Card>
+  <Card title="Recoveries" icon="rotate-ccw" href="/student/recoveries">
+    Schedule makeup sessions for classes you missed.
+  </Card>
+  <Card title="News" icon="newspaper" href="/student/news">
+    Read official announcements and publications from the academy.
+  </Card>
+</CardGroup>
+
+### Desktop navigation
+
+On screens wider than `md` (768 px), the sidebar is visible on the left. Each menu item links to a sub-route under `/dashboard/student/`.
+
+### Mobile navigation
+
+On mobile, a bottom navigation bar replaces the sidebar. The same eight sections are accessible as icon buttons along the bottom of the screen.
+
+## Route map
+
+```text
+/dashboard/student                   → Home / overview
+/dashboard/student/myRegistrations   → My Registrations
+/dashboard/student/enrollment        → Enrollment
+/dashboard/student/payments          → Payments
+/dashboard/student/profile           → Profile
+/dashboard/student/injuries          → Injuries
+/dashboard/student/recoveries        → Recoveries
+/dashboard/student/news              → News (Muro Gema)
+```
+
+<Note>
+  All routes under `/dashboard/student` require an active session with the **Alumno** role. If your session expires, you are redirected to `/login`.
+</Note>

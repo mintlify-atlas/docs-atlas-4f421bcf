@@ -1,0 +1,128 @@
+---
+title: "Publications Management"
+description: "Create, manage, and delete club announcements that appear in the student news feed."
+---
+
+The **Publications** module (`/dashboard/admin/publications`) is the academy's announcement board. You create news items here and they instantly appear in every student's news feed under the **Muro de Publicaciones** section of the app.
+
+## Viewing publications
+
+The page loads all existing publications from:
+
+```http
+GET /publicaciones
+```
+
+Publications appear as cards in a 3-column grid. Each card shows:
+- `imagen_url` — featured image (if uploaded)
+- `titulo` — announcement title
+- `contenido` — body text (capped to 4 lines)
+- `creado_en` — creation date
+- Author name from `administrador.usuarios.nombres`
+- Delete button
+
+---
+
+## Creating a publication
+
+<Steps>
+  <Step title="Click 'Crear Noticia'">
+    From the publications list, click the **Crear Noticia** button in the top-right corner.
+  </Step>
+  <Step title="Fill in the title">
+    Enter the `titulo`. This appears as the headline of the announcement. Example: `¡MAÑANA GRAN TORNEO!`
+  </Step>
+  <Step title="Write the content">
+    Enter the `contenido` body text in the textarea. Supports plain text — no markdown.
+  </Step>
+  <Step title="Upload a featured image (optional)">
+    Click the image upload area to select a file. Only image files are accepted (`image/*`). A preview renders immediately. The image is uploaded to Cloudinary via `POST /cloudinary` and the resulting URL is stored in `imagen_url`.
+  </Step>
+  <Step title="Publish">
+    Click **Publicar en el Muro**. The form submits as `multipart/form-data`:
+
+    ```http
+    POST /publicaciones
+    Content-Type: multipart/form-data
+
+    titulo: "¡MAÑANA GRAN TORNEO!"
+    contenido: "Mañana a las 10am en Sede Norte..."
+    autor_id: 5
+    imagen: <file>
+    ```
+
+    On success, the view returns to the publications list and the new card appears.
+  </Step>
+</Steps>
+
+---
+
+## Publication fields
+
+| Field | Type | Description |
+|---|---|---|
+| `titulo` | string | Headline of the announcement |
+| `contenido` | text | Body text |
+| `autor_id` | integer | ID of the admin creating the publication |
+| `imagen` | file | Optional featured image (uploaded via Cloudinary) |
+| `imagen_url` | string | Cloudinary URL stored after upload |
+| `creado_en` | timestamp | Auto-set on creation |
+
+---
+
+## Deleting a publication
+
+Click the trash icon on a publication card. A native browser confirmation dialog appears. If confirmed:
+
+```http
+DELETE /publicaciones/:id
+```
+
+The card is removed from the grid immediately.
+
+<Warning>
+  There is no undo for deletion. The Cloudinary image is not automatically deleted when a publication is removed — orphaned images remain in the Cloudinary account.
+</Warning>
+
+---
+
+## Image upload via Cloudinary
+
+The publications form handles image upload internally — you do not need to upload to Cloudinary separately. The interceptor sends the `FormData` payload directly and the backend handles the Cloudinary upload and returns the `imagen_url`.
+
+For standalone image uploads outside of publications:
+
+```http
+POST /cloudinary
+Content-Type: multipart/form-data
+
+file: <image_file>
+```
+
+---
+
+## How publications appear in the student app
+
+Students see all publications ordered by `creado_en` descending (newest first). Each publication displays the featured image (if present), title, body, and publication date. Students cannot interact with publications — they are read-only announcements.
+
+<Tip>
+  Use publications for: tournament announcements, schedule changes not handled by the rescheduling system, club news, and enrollment reminders.
+</Tip>
+
+---
+
+## API reference
+
+```http
+# List all publications
+GET /publicaciones
+
+# Get a single publication
+GET /publicaciones/:id
+
+# Create a publication (multipart)
+POST /publicaciones
+
+# Delete a publication
+DELETE /publicaciones/:id
+```

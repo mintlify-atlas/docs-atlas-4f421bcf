@@ -1,0 +1,53 @@
+---
+title: "News & Publications"
+description: "How to read academy announcements on the Muro Gema and how the news read-state is tracked."
+---
+
+The **Muro Gema** (`/dashboard/student/news`) is where Club Gema publishes official announcements, promotional updates, and community news.
+
+## Reading the news feed
+
+Publications are loaded from `GET /publicaciones` when you open the news page. They are sorted in reverse chronological order (newest first). The header displays the total number of published communications.
+
+Each publication card shows:
+
+| Field | Description |
+|---|---|
+| `titulo` | The headline of the announcement |
+| `contenido` | The full body text of the publication |
+| `imagen_url` | A cover image (if provided by the admin). Falls back to a placeholder icon if no image is set. |
+| `creado_en` | The publication date, shown on the cover image overlay |
+
+Publications are marked as originating from **Club Gema Oficial · Sede Lima Norte**.
+
+## How read state is tracked
+
+When you open the news page, the application records the ID of the most recent publication in a cookie:
+
+```js
+Cookies.set('last_viewed_news', String(ordenadas[0].id), { expires: 365, sameSite: 'strict' })
+```
+
+The key is `last_viewed_news` and it is stored with a 1-year expiry. Other parts of the application (such as the sidebar badge) compare the latest publication ID against this cookie to decide whether to show a **new content** indicator. After you visit the news page, the indicator clears automatically.
+
+A `news_read` window event is also dispatched so that any in-page components listening for that event can update their unread state immediately.
+
+<Info>
+  The `last_viewed_news` cookie is also cleared on logout (`localStorage.removeItem('last_viewed_news')` in `logoutService`). After a fresh login, the unread indicator will show if new publications were posted while you were logged out.
+</Info>
+
+## Types of publications
+
+All publications share the same structure from the `/publicaciones` endpoint. The academy uses a single content type for all communications:
+
+- **Comunicado Oficial** — general announcements, schedule changes, promotions, and community news
+
+There is no category filter on the student-facing news page. All published items appear in the feed in chronological order.
+
+## Empty state
+
+If no publications exist yet, the page shows a **Aún no hay anuncios oficiales** empty state with a megaphone icon.
+
+<Tip>
+  Check the news page regularly. Important operational notices — such as holiday schedule changes, venue updates, or promotional deadlines — are communicated exclusively through the Muro Gema.
+</Tip>

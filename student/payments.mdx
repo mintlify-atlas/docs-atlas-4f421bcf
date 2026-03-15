@@ -1,0 +1,86 @@
+---
+title: "Payments"
+description: "How to view your outstanding accounts, report a payment, and understand the payment workflow at Club Gema."
+---
+
+Club Gema uses a **report-then-validate** payment model. You report a payment you have already made (via Yape, Plin, bank transfer, or cash), and an administrator then validates it. Your account is not credited until the admin approves the report.
+
+## Accessing the Payments section
+
+Go to `/dashboard/student/payments`. The page loads two data sets in parallel:
+
+- Your outstanding accounts from `GET /cuentas-por-cobrar/historial/:id`
+- Your payment report history from `GET /pagos/alumno/:id`
+
+## Payment methods
+
+The page displays a **PaymentMethodCard** with the Club Gema Yape/Plin number and a QR code for digital payments. The club phone number for Yape/Plin is shown and can be copied to your clipboard.
+
+## Understanding your accounts (Cuentas Pendientes)
+
+Accounts with status `PENDIENTE`, `PARCIAL`, or `POR_VALIDAR` appear in the **Cuentas Pendientes** column. Each account card shows:
+
+- The concept (e.g., monthly tuition)
+- The total amount due (`monto_final`)
+- The amount already paid
+- The remaining balance (`saldoRestante = monto_final − total paid`)
+
+### Payment statuses
+
+| Status | Meaning |
+|---|---|
+| `PENDIENTE` | No payment has been made yet |
+| `PARCIAL` | A partial payment has been reported and validated |
+| `PAGADO` | The full amount has been paid and validated |
+| `VENCIDO` | The due date has passed without full payment |
+| `CANCELADO` | The account has been cancelled by administration |
+| `POR_VALIDAR` | A payment report is pending admin review |
+
+<Warning>
+  Accounts with status `PENDIENTE` or `PARCIAL` block new enrollments and suspend access to the makeup session (Recuperación) benefit. The **Aviso de Continuidad Crítico** banner is displayed at the top of the page when you have active debts.
+</Warning>
+
+## Reporting a payment
+
+<Steps>
+  <Step title="Click Reportar on an account">
+    In the **Cuentas Pendientes** section, click the report button on the account you want to pay. The **ReportPaymentModal** opens.
+  </Step>
+  <Step title="Enter the payment details">
+    Fill in the fields in the modal:
+
+    | Field | Notes |
+    |---|---|
+    | `monto` | Amount you are reporting. Pre-filled with the remaining balance. |
+    | `metodo_pago` | `YAPE`, `PLIN`, `TRANSFERENCIA`, or `EFECTIVO` |
+    | `codigo_operacion` | Transaction reference/operation code. Required for all methods except `EFECTIVO`. |
+    | `voucher` | Photo of your payment receipt (JPG, PNG). Required for all methods except `EFECTIVO`. |
+
+    For **EFECTIVO** payments, no code or voucher is required. Instead, a note instructs you to visit the main office to validate in person.
+  </Step>
+  <Step title="Submit the report">
+    Click **Confirmar Registro**. The system posts a `multipart/form-data` request to `POST /pagos/reportar` containing:
+
+    ```text
+    deuda_id        (integer)
+    monto           (decimal)
+    metodo_pago     (string)
+    codigo_operacion (string)
+    voucher         (file, optional)
+    ```
+
+    A success toast **¡Pago reportado!** confirms submission.
+  </Step>
+</Steps>
+
+<Info>
+  After you report a payment, it appears in your **Historial de Reportes** with status `POR_VALIDAR`. Your account balance does not change until an administrator validates the report.
+</Info>
+
+## Viewing payment history
+
+The **Historial de Reportes** column on the right side of the page shows all your payment reports in reverse chronological order. Each entry shows the amount, method, date, and current status. The list scrolls independently — if you have more than three records, a scroll indicator is shown.
+
+## Billing cycle
+
+Accounts are created by the administration at the start of each monthly cycle. The `fecha_vencimiento` field on each account indicates when payment is due. Unpaid accounts transition to `VENCIDO` after the due date passes. Contact your administrator if you need an extension or see an incorrect charge.

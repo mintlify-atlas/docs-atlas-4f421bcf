@@ -1,0 +1,154 @@
+---
+title: "Managing Your Profile"
+description: "How to view and update your coordinator profile, including personal data, specialization, and password."
+---
+
+## Accessing Your Profile
+
+Navigate to **Mi Perfil** from the sidebar or go directly to `/dashboard/teacher/profile`. The page fetches your current data from:
+
+```http
+GET /coordinadores/{userId}
+```
+
+The response contains a nested structure where personal fields live in the `user` object and coordinator-specific fields live in `user.coordinadores`:
+
+```json
+{
+  "data": {
+    "id": 7,
+    "nombres": "Carlos",
+    "apellidos": "Mamani",
+    "email": "carlos.mamani@gema.pe",
+    "telefono_personal": "987654321",
+    "coordinadores": {
+      "especializacion": "Voleibol Técnico"
+    }
+  }
+}
+```
+
+---
+
+## Profile Fields
+
+Your profile page displays two sections:
+
+### Información Personal
+
+| Field | Database column | Description |
+|-------|----------------|-------------|
+| **Email Asociado** | `usuarios.email` | Your login email address |
+| **Celular / WhatsApp** | `usuarios.telefono_personal` | Your contact phone number |
+
+### Datos Profesionales
+
+| Field | Database column | Description |
+|-------|----------------|-------------|
+| **Especialización** | `profesores.especializacion` | Your volleyball or training specialization (e.g., "Voleibol Técnico") |
+
+<Info>
+  Your full name (`nombres` + `apellidos`) is displayed in the hero card at the top of the profile page and in the top-right corner of every page header. It also appears on class session cards visible to enrolled students.
+</Info>
+
+---
+
+## Editing Your Profile
+
+Click **Editar Datos** in the hero card to open the edit modal.
+
+### Editable Fields
+
+The modal is divided into two sections:
+
+<Tabs>
+  <Tab title="Datos Generales">
+    | Field | Form key | Notes |
+    |-------|----------|-------|
+    | Nombres | `nombres` | Your first name(s) |
+    | Apellidos | `apellidos` | Your last name(s) |
+    | Email Asociado | `email` | Must be a valid email address |
+    | Celular / WhatsApp | `telefono_personal` | Freeform text |
+  </Tab>
+  <Tab title="Datos Profesionales">
+    | Field | Form key | Notes |
+    |-------|----------|-------|
+    | Especialización | `especializacion` | Freeform text (e.g., "Voleibol Técnico", "Baloncesto Técnico") |
+  </Tab>
+</Tabs>
+
+### How Updates Are Sent
+
+Clicking **GUARDAR CAMBIOS** sends a `PATCH` request:
+
+```http
+PATCH /coordinadores/{userId}
+```
+
+The payload only includes fields that have a non-empty value — blank fields are omitted:
+
+```json
+{
+  "nombres": "Carlos",
+  "apellidos": "Mamani",
+  "email": "carlos.mamani@gema.pe",
+  "telefono_personal": "987654321",
+  "especializacion": "Voleibol Técnico"
+}
+```
+
+On success:
+- A toast notification confirms `"¡Datos actualizados!"`
+- The modal closes
+- The profile page re-fetches your data from `/coordinadores/{userId}` to reflect the changes immediately
+- The auth context is also updated so your name in the header and class cards refreshes without a page reload
+
+<Warning>
+  If you leave **Nombres** or **Apellidos** blank in the form, those fields are omitted from the payload and your existing name is preserved. To intentionally clear a field, you must contact an administrator.
+</Warning>
+
+---
+
+## Changing Your Password
+
+Click **Contraseña** in the hero card to open the password change modal. This is handled by the shared `ChangePasswordModal` component.
+
+The endpoint used is:
+
+```http
+POST /auth/change-password
+```
+
+<Steps>
+  <Step title="Open the modal">
+    Click **Contraseña** on your profile page.
+  </Step>
+  <Step title="Enter your current password">
+    Type your existing password in the first field to verify your identity.
+  </Step>
+  <Step title="Set a new password">
+    Enter your new password and confirm it in the second and third fields.
+  </Step>
+  <Step title="Save">
+    Submit the form. On success you receive a confirmation toast and the modal closes. Your next login will require the new password.
+  </Step>
+</Steps>
+
+<Note>
+  Password changes take effect immediately. If you are logged in on other devices or browsers, those sessions may be invalidated depending on your token refresh settings.
+</Note>
+
+---
+
+## Profile Impact on Other Views
+
+Your profile data is not isolated to this page — several other parts of the platform read from it:
+
+| Where your data appears | Which field |
+|-------------------------|-------------|
+| Dashboard greeting (`HOLA, NOMBRE 👋`) | `nombres` + `apellidos` |
+| Top-right header badge | `nombres` + `apellidos`, `rol` |
+| Sidebar branding | Your initial (`nombres.charAt(0)`) |
+| Hero card avatar | Your initial (`nombres.charAt(0)`) |
+
+Keeping your `nombres` and `apellidos` accurate ensures every student and admin who sees a class card attributed to you sees the correct instructor name.

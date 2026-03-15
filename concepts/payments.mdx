@@ -1,0 +1,127 @@
+---
+title: "Payments and billing"
+description: "How the payment and accounts receivable system works in Academia Gema, from student payment reporting to admin validation."
+---
+
+Academia Gema uses a two-step payment model: students report that they have made a payment, and an administrator validates it. This keeps the workflow lean without requiring a real-time payment gateway integration.
+
+## Data model
+
+### Accounts receivable (`cuentas_por_cobrar`)
+
+```sql
+CREATE TABLE cuentas_por_cobrar (
+    id               SERIAL PRIMARY KEY,
+    alumno_id        INT NOT NULL REFERENCES alumnos(usuario_id),
+    concepto         VARCHAR(150) NOT NULL,
+    monto            DECIMAL(10, 2) NOT NULL,
+    fecha_vencimiento DATE NOT NULL,
+    estado           VARCHAR(20) DEFAULT 'PENDIENTE'
+                       CHECK (estado IN ('PENDIENTE', 'PARCIAL', 'PAGADO', 'VENCIDO', 'CANCELADO')),
+    creado_en        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    actualizado_en   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+### Payment records (`pagos`)
+
+```sql
+CREATE TABLE pagos (
+    id                    SERIAL PRIMARY KEY,
+    cuenta_id             INT NOT NULL REFERENCES cuentas_por_cobrar(id),
+    monto_pagado          DECIMAL(10, 2) NOT NULL,
+    fecha_pago            TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    metodo_pago           VARCHAR(50) NOT NULL,
+    referencia_transaccion VARCHAR(100)
+);
+```
+
+Each `pagos` row is a payment event against a specific `cuentas_por_cobrar` record. Multiple payment rows can exist for the same account (partial payments).
+
+## Account status lifecycle
+
+| Status | Meaning |
+|--------|--------|
+| `PENDIENTE` | Account created; no payment received yet |
+| `PARCIAL` | One or more payments received but the balance is not fully covered |
+| `PAGADO` | The full amount has been validated by an administrator |
+| `VENCIDO` | The `fecha_vencimiento` has passed with the account still unpaid |
+| `CANCELADO` | The account was voided (e.g., student withdrew) |
+
+The `actualizado_en` column is refreshed automatically by the `trg_actualizar_cuentas` trigger on every update.
+
+## Payment flow
+
+<Steps>
+  <Step title="Account is created">
+    An administrator creates a `cuentas_por_cobrar` record for a student, specifying the `concepto` (e.g., monthly tuition), `monto`, and `fecha_vencimiento`.
+  </Step>
+
+  <Step title="Student reports a payment">
+    The student goes to `/dashboard/student/payments`, selects the pending account, and submits a payment report via `POST /pagos/reportar`. They provide:
+
+    - The payment amount
+    - The payment method (from `GET /metodos-pago`)
+    - A transaction reference or proof of transfer
+  </Step>
+
+  <Step title="Admin reviews and validates">
+    The administrator navigates to `/dashboard/admin/payment-validation`. The page fetches pending reports from `GET /pagos/gestion-admin`.
+
+    The admin reviews the submitted details and either:
+    - Approves with `POST /pagos/validar` — marks the `pagos` record as validated and updates the `cuentas_por_cobrar` status.
+    - Rejects the report if the reference is incorrect or the amount does not match.
+  </Step>
+
+  <Step title="Account status is updated">
+    - If `monto_pagado` equals `monto`, the account moves to `PAGADO`.
+    - If `monto_pagado` is less than `monto`, the account moves to `PARCIAL`.
+    - If `fecha_vencimiento` passes with `estado` still `PENDIENTE` or `PARCIAL`, the account can be marked `VENCIDO`.
+  </Step>
+</Steps>
+
+## API endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/pagos` | List all payments |
+| `GET` | `/pagos/gestion-admin` | Admin view: all pending payment reports |
+| `GET` | `/pagos/alumno/:id` | Payment history for a specific student |
+| `POST` | `/pagos/reportar` | Student reports a payment |
+| `POST` | `/pagos/validar` | Admin validates a reported payment |
+| `GET` | `/cuentas-por-cobrar` | List all accounts receivable |
+| `GET` | `/cuentas-por-cobrar/historial/:id` | Account history for a student |
+| `GET` | `/metodos-pago` | List available payment methods |
+
+## Plan catalog
+
+The `catalogo` table stores the academy's subscription plans and pricing options. Students and admins use it to understand what plans are available for enrollment.
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /catalogo` | All catalog entries |
+| `GET /catalogo/activos` | Active catalog entries |
+| `GET /catalogo/vigentes` | Currently valid (non-expired) catalog entries |
+| `GET /catalogo/:id` | Single catalog entry |
+
+Catalog entries are managed by administrators at `/dashboard/admin/catalog`.
+
+## Discounts and benefits
+
+Academia Gema supports a benefits system that applies discounts to a student's `cuentas_por_cobrar`.
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /tipos-beneficio` | List all benefit types |
+| `POST /descuentos/aplicar` | Apply a discount to an account |
+| `GET /beneficioPendiente` | List pending benefit approvals |
+
+Administrators create and manage benefit types at `/dashboard/admin/benefits`. When a discount is applied via `POST /descuentos/aplicar`, the `monto` on the target `cuentas_por_cobrar` is adjusted accordingly before the student makes their payment.
+
+<Tip>
+  Use benefit types to model recurring discounts such as sibling enrollment, early-payment bonuses, or scholarship programs.
+</Tip>
+
+## Student payment view
+
+Students access their full payment history and outstanding balances at `/dashboard/student/payments`. The page calls `GET /pagos/alumno/:id` using the `user_id` cookie value to scope results to the authenticated student.

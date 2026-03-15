@@ -1,0 +1,143 @@
+---
+title: "Location & Court Management"
+description: "Manage sedes (venues) and canchas (courts). Create new venues with full address data and add courts that can be assigned to class schedules."
+---
+
+The **Locations** module (`/dashboard/admin/locations`) manages the physical infrastructure of Academia Gema. A **sede** is a venue (e.g., Sede Norte) and a **cancha** is a court within that venue. Every class schedule must be assigned to a cancha.
+
+## Data model
+
+### Sedes table
+
+| Field | Type | Description |
+|---|---|---|
+| `id` | integer | Primary key |
+| `nombre` | string (100) | Display name — e.g., `Sede Norte` |
+| `activo` | boolean | Whether the sede is operational |
+| `direccion_id` | integer | FK to `direcciones` |
+
+### Direcciones table
+
+The `direcciones` table is normalized separately:
+
+| Field | Type | Description |
+|---|---|---|
+| `direccion_completa` | string | Full street address |
+| `distrito` | string | District within the city |
+| `ciudad` | string | City (Lima, Arequipa, Trujillo) |
+| `referencia` | string | Landmark or cross-street reference |
+
+### Canchas table
+
+| Field | Type | Description |
+|---|---|---|
+| `id` | integer | Primary key |
+| `sede_id` | integer | FK to `sedes` |
+| `nombre` | string (50) | Court name — e.g., `Cancha 1 - Techada` |
+| `descripcion` | string (200) | Optional description |
+
+---
+
+## Viewing sedes
+
+The Locations list calls `GET /sedes` (via `sedeService.getAll()`). Each sede card shows:
+- Name and active/inactive badge
+- District from `direcciones.distrito`
+- Number of canchas (`canchas.length`)
+- Edit and delete action buttons
+
+Search by sede name or district.
+
+---
+
+## Creating a new sede
+
+<Steps>
+  <Step title="Click 'Agregar Nueva Sede'">
+    From the locations list, click the button in the top-right corner.
+  </Step>
+  <Step title="Fill in general information">
+    | Field | Required | Notes |
+    |---|---|---|
+    | `nombre` | Yes | Sede display name |
+    | `telefono_contacto` | No | Contact phone |
+    | `tipo_instalacion` | No | e.g., `Club Deportivo`, `Complejo Techado` |
+  </Step>
+  <Step title="Enter the address">
+    | Field | Required | Notes |
+    |---|---|---|
+    | `direccion_completa` | No | Full street address |
+    | `ciudad` | Yes | Lima, Arequipa, or Trujillo |
+    | `distrito` | Yes | District within the selected city |
+    | `referencia` | No | Landmark or cross-street |
+
+    The city selector populates the district dropdown with the valid districts for that city.
+  </Step>
+  <Step title="Add canchas">
+    At least one cancha with a non-empty `nombre` is required. Click the **+** button to add more courts. Each court has:
+    - `nombre` — e.g., `Cancha A`, `Cancha Principal Techada`
+    - `descripcion` — optional details
+  </Step>
+  <Step title="Save">
+    Click **Finalizar Registro**. The form calls `sedeService.create()` which posts to:
+
+    ```http
+    POST /sedes
+    Content-Type: application/json
+
+    {
+      "nombre": "Sede Norte",
+      "telefono_contacto": "01-555-0123",
+      "tipo_instalacion": "Club Deportivo",
+      "administrador_id": 5,
+      "direccion": {
+        "direccion_completa": "Av. Universitaria 2500",
+        "distrito": "Los Olivos",
+        "ciudad": "Lima",
+        "referencia": "Frente al parque Naranjal"
+      },
+      "canchas": [
+        { "nombre": "Cancha A", "descripcion": "Techada, piso de madera" },
+        { "nombre": "Cancha B", "descripcion": "Al aire libre" }
+      ]
+    }
+    ```
+  </Step>
+</Steps>
+
+---
+
+## Editing a sede
+
+1. Click the pencil icon on a sede card.
+2. The same form loads pre-filled with existing data including current canchas.
+3. You can rename courts, add new ones, or remove courts that are not yet assigned to any active schedule.
+4. Click **Actualizar Sede** to call `sedeService.update(id, payload)` → `PUT /sedes/:id`.
+
+---
+
+## Deleting a sede
+
+Click the trash icon on a sede card and confirm. This calls `sedeService.delete(id)` → `DELETE /sedes/:id`.
+
+<Warning>
+  Deleting a sede also deletes its associated canchas and address record. Any schedule linked to one of those canchas will become invalid. Reassign schedules before deleting a sede.
+</Warning>
+
+---
+
+## Occupancy data
+
+The admin dashboard **Ocupación** donut chart pulls from:
+
+```http
+GET /sedes/dashboard/ocupacion
+```
+
+This returns an array of `{ nombre, valor }` objects — one per sede — where `valor` is the count of active students enrolled in classes at that sede.
+
+To view only active sedes in public-facing contexts (e.g., schedule browsing), use:
+
+```http
+GET /sedes/activas
+```

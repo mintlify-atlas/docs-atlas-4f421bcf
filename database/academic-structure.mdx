@@ -1,0 +1,197 @@
+---
+title: Academic structure schema
+description: Full schema for the infrastructure and academic tables — venues, courts, training levels, schedules, enrollments, and attendance.
+---
+
+These tables define the physical and organizational structure of the academy: where classes happen, who teaches them, and which students attend.
+
+---
+
+## direcciones
+
+Normalized address table. Venues (`sedes`) reference this table rather than storing address data directly.
+
+```sql
+CREATE TABLE direcciones (
+    id SERIAL PRIMARY KEY,
+    calle_principal VARCHAR(255) NOT NULL,
+    calle_secundaria VARCHAR(255),
+    ciudad VARCHAR(100) NOT NULL,
+    estado_provincia VARCHAR(100),
+    codigo_postal VARCHAR(20),
+    pais VARCHAR(50) DEFAULT 'Peru',
+    creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| `id` | `SERIAL` | `PRIMARY KEY` | Auto-incrementing address ID. |
+| `calle_principal` | `VARCHAR(255)` | `NOT NULL` | Primary street name or address line. |
+| `calle_secundaria` | `VARCHAR(255)` | | Intersection or secondary reference. |
+| `ciudad` | `VARCHAR(100)` | `NOT NULL` | City. Indexed by `idx_direcciones_ciudad`. |
+| `estado_provincia` | `VARCHAR(100)` | | Department or province. |
+| `codigo_postal` | `VARCHAR(20)` | | Postal code. |
+| `pais` | `VARCHAR(50)` | `DEFAULT 'Peru'` | Country. Defaults to `Peru`. |
+| `creado_en` | `TIMESTAMP` | `DEFAULT CURRENT_TIMESTAMP` | Record creation timestamp. |
+
+---
+
+## sedes
+
+Physical academy venues/locations.
+
+```sql
+CREATE TABLE sedes (
+    id SERIAL PRIMARY KEY,
+    direccion_id INT NOT NULL REFERENCES direcciones(id),
+    nombre VARCHAR(100) NOT NULL,
+    activo BOOLEAN DEFAULT TRUE
+);
+```
+
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| `id` | `SERIAL` | `PRIMARY KEY` | Auto-incrementing venue ID. |
+| `direccion_id` | `INT` | `NOT NULL, FK → direcciones.id` | The address of this venue. |
+| `nombre` | `VARCHAR(100)` | `NOT NULL` | Venue display name (e.g. `Sede Norte`). |
+| `activo` | `BOOLEAN` | `DEFAULT TRUE` | Whether the venue is currently operating. |
+
+---
+
+## canchas
+
+Courts within a venue. Each court belongs to exactly one venue.
+
+```sql
+CREATE TABLE canchas (
+    id SERIAL PRIMARY KEY,
+    sede_id INT NOT NULL REFERENCES sedes(id),
+    nombre VARCHAR(50) NOT NULL,
+    descripcion VARCHAR(200)
+);
+```
+
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| `id` | `SERIAL` | `PRIMARY KEY` | Auto-incrementing court ID. |
+| `sede_id` | `INT` | `NOT NULL, FK → sedes.id` | The venue this court belongs to. |
+| `nombre` | `VARCHAR(50)` | `NOT NULL` | Court name (e.g. `Cancha 1 - Techada`). |
+| `descripcion` | `VARCHAR(200)` | | Optional description or notes. |
+
+---
+
+## niveles_entrenamiento
+
+Training levels used to categorize class schedules and determine monthly pricing.
+
+```sql
+CREATE TABLE niveles_entrenamiento (
+    id SERIAL PRIMARY KEY,
+    nombre VARCHAR(50) NOT NULL,
+    precio_mensual DECIMAL(10, 2) NOT NULL
+);
+```
+
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| `id` | `SERIAL` | `PRIMARY KEY` | Auto-incrementing level ID. |
+| `nombre` | `VARCHAR(50)` | `NOT NULL` | Level name (e.g. `Principiante`, `Intermedio`, `Avanzado`). |
+| `precio_mensual` | `DECIMAL(10, 2)` | `NOT NULL` | Monthly fee for students enrolled at this level. |
+
+---
+
+## horarios_clases
+
+Defines recurring class schedules. Each row is a weekly slot: a specific court, professor, training level, day, and time window.
+
+```sql
+CREATE TABLE horarios_clases (
+    id SERIAL PRIMARY KEY,
+    sede_id INT NOT NULL REFERENCES sedes(id),
+    cancha_id INT REFERENCES canchas(id),
+    profesor_id INT NOT NULL REFERENCES profesores(usuario_id),
+    nivel_id INT NOT NULL REFERENCES niveles_entrenamiento(id),
+    dia_semana INT NOT NULL CHECK (dia_semana BETWEEN 1 AND 7),
+    hora_inicio TIME NOT NULL,
+    hora_fin TIME NOT NULL,
+    capacidad_max INT DEFAULT 20,
+    activo BOOLEAN DEFAULT TRUE,
+    CONSTRAINT unica_cancha_hora UNIQUE (cancha_id, dia_semana, hora_inicio)
+);
+```
+
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| `id` | `SERIAL` | `PRIMARY KEY` | Auto-incrementing schedule ID. |
+| `sede_id` | `INT` | `NOT NULL, FK → sedes.id` | The venue hosting this class. |
+| `cancha_id` | `INT` | `FK → canchas.id` | The court assigned to this class. |
+| `profesor_id` | `INT` | `NOT NULL, FK → profesores.usuario_id` | The professor teaching this class. |
+| `nivel_id` | `INT` | `NOT NULL, FK → niveles_entrenamiento.id` | The training level for this class. |
+| `dia_semana` | `INT` | `NOT NULL, CHECK (1..7)` | Day of the week: `1` = Monday, `7` = Sunday. |
+| `hora_inicio` | `TIME` | `NOT NULL` | Class start time. |
+| `hora_fin` | `TIME` | `NOT NULL` | Class end time. |
+| `capacidad_max` | `INT` | `DEFAULT 20` | Maximum number of enrolled students. |
+| `activo` | `BOOLEAN` | `DEFAULT TRUE` | Whether this schedule is currently active. |
+
+<Warning>
+  The `unica_cancha_hora` unique constraint on `(cancha_id, dia_semana, hora_inicio)` prevents double-booking a court. Inserting a conflicting schedule will fail with a unique constraint violation.
+</Warning>
+
+---
+
+## inscripciones
+
+Records which students are enrolled in which schedules.
+
+```sql
+CREATE TABLE inscripciones (
+    id SERIAL PRIMARY KEY,
+    alumno_id INT NOT NULL REFERENCES alumnos(usuario_id),
+    horario_id INT NOT NULL REFERENCES horarios_clases(id),
+    fecha_inscripcion DATE DEFAULT CURRENT_DATE,
+    estado VARCHAR(20) DEFAULT 'ACTIVO'
+        CHECK (estado IN ('ACTIVO', 'SUSPENDIDO', 'RETIRADO')),
+    actualizado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT unica_inscripcion_alumno UNIQUE (alumno_id, horario_id)
+);
+```
+
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| `id` | `SERIAL` | `PRIMARY KEY` | Auto-incrementing enrollment ID. |
+| `alumno_id` | `INT` | `NOT NULL, FK → alumnos.usuario_id` | The enrolled student. Indexed by `idx_inscripciones_alumno`. |
+| `horario_id` | `INT` | `NOT NULL, FK → horarios_clases.id` | The schedule the student is enrolled in. Indexed by `idx_inscripciones_horario`. |
+| `fecha_inscripcion` | `DATE` | `DEFAULT CURRENT_DATE` | Date the enrollment was created. |
+| `estado` | `VARCHAR(20)` | `DEFAULT 'ACTIVO'` | Enrollment status: `ACTIVO`, `SUSPENDIDO`, or `RETIRADO`. |
+| `actualizado_en` | `TIMESTAMP` | `DEFAULT CURRENT_TIMESTAMP` | Last status change. Maintained by the `trg_actualizar_inscripciones` trigger. |
+
+---
+
+## registros_asistencia
+
+Stores one attendance record per enrolled student per class day.
+
+```sql
+CREATE TABLE registros_asistencia (
+    id SERIAL PRIMARY KEY,
+    inscripcion_id INT NOT NULL REFERENCES inscripciones(id),
+    fecha DATE NOT NULL,
+    estado VARCHAR(20) DEFAULT 'PRESENTE'
+        CHECK (estado IN ('PRESENTE', 'AUSENTE', 'TARDE', 'JUSTIFICADO')),
+    registrado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT asistencia_unica_diaria UNIQUE (inscripcion_id, fecha)
+);
+```
+
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| `id` | `SERIAL` | `PRIMARY KEY` | Auto-incrementing record ID. |
+| `inscripcion_id` | `INT` | `NOT NULL, FK → inscripciones.id` | The enrollment this record belongs to. Indexed by `idx_asistencia_inscripcion`. |
+| `fecha` | `DATE` | `NOT NULL` | The date of the class session. |
+| `estado` | `VARCHAR(20)` | `DEFAULT 'PRESENTE'` | Attendance status: `PRESENTE`, `AUSENTE`, `TARDE`, or `JUSTIFICADO`. |
+| `registrado_en` | `TIMESTAMP` | `DEFAULT CURRENT_TIMESTAMP` | When the attendance was recorded. |
+
+<Note>
+  The `asistencia_unica_diaria` unique constraint on `(inscripcion_id, fecha)` guarantees at most one attendance record per student per class day. Coordinators use `POST /asistencias/masiva` to create records for all students in a class at once.
+</Note>

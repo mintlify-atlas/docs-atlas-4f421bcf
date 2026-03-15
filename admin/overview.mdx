@@ -1,0 +1,103 @@
+---
+title: "Admin Guide Overview"
+description: "Complete overview of the Academia Gema administrator module — what you can manage, key workflows, and quick navigation to every admin section."
+---
+
+The **Administrador** role gives you full control over Academia Gema's operations. Every admin page lives under `/dashboard/admin/*` and is accessible from the sidebar once you log in with an account that has the `Administrador` role.
+
+## What the admin module covers
+
+<CardGroup cols={2}>
+  <Card title="Dashboard" icon="chart-line" href="/admin/dashboard">
+    Real-time KPIs: student counts, pending debt, occupancy by sede, income charts, and age / gender breakdowns.
+  </Card>
+  <Card title="Students" icon="users" href="/admin/students">
+    View, search, and inspect every enrolled student. Export the full directory to Excel.
+  </Card>
+  <Card title="Teachers" icon="chalkboard-user" href="/admin/teachers">
+    Register and edit coordinators. View specialization and contact details.
+  </Card>
+  <Card title="Schedules" icon="calendar" href="/admin/schedules">
+    Create weekly class slots (horarios). Assign sede, cancha, coordinator, level, day, and time.
+  </Card>
+  <Card title="Levels" icon="trophy" href="/admin/levels">
+    Define training levels (`niveles_entrenamiento`) that appear on the public schedule browser.
+  </Card>
+  <Card title="Locations" icon="map-pin" href="/admin/locations">
+    Manage sedes (venues) and their canchas (courts). View occupancy from the dashboard.
+  </Card>
+  <Card title="Payments" icon="wallet" href="/admin/payments">
+    Review all payment records fetched from `/pagos/gestion-admin`.
+  </Card>
+  <Card title="Payment Validation" icon="circle-check" href="/admin/payment-validation">
+    Approve or reject student-submitted payment vouchers.
+  </Card>
+  <Card title="Catalog" icon="tag" href="/admin/catalog">
+    Edit plan prices and weekly-class counts. Control which plans appear on the public pricing page.
+  </Card>
+  <Card title="Injuries" icon="heart-pulse" href="/admin/injuries">
+    Triage pending injury reports submitted by students.
+  </Card>
+  <Card title="Guest Passes" icon="ticket" href="/admin/guest-passes">
+    Sell walk-in class passes with the Taquilla Express form.
+  </Card>
+  <Card title="Reschedules" icon="rotate" href="/admin/reschedules">
+    Mass-reschedule all classes on a date and manage public holidays.
+  </Card>
+  <Card title="Publications" icon="megaphone" href="/admin/publications">
+    Post announcements to the student news feed.
+  </Card>
+  <Card title="Benefits" icon="percent" href="/admin/benefits">
+    Apply discounts and scholarships to student accounts.
+  </Card>
+  <Card title="Settings" icon="gear" href="/admin/settings">
+    Edit system parameters that control billing cycles, cut dates, and more.
+  </Card>
+</CardGroup>
+
+---
+
+## Sidebar navigation
+
+The admin sidebar groups items into the following sections:
+
+| Section | Items |
+|---|---|
+| Overview | Dashboard |
+| People | Students, Teachers |
+| Operations | Schedules, Levels, Locations |
+| Finance | Payments, Payment Validation, Catalog |
+| Welfare | Injuries, Guest Passes, Benefits |
+| Management | Reschedules, Publications, Settings |
+
+---
+
+## Key workflows
+
+<Steps>
+  <Step title="Onboarding a new student">
+    1. Go to **Students** (`/dashboard/admin/students`).
+    2. Student accounts are created through the public registration flow or directly via `POST /usuarios/register` with `rol_id: "alumno"`.
+    3. The student's profile includes personal data (`nombres`, `apellidos`, `email`, `telefono_personal`, `fecha_nacimiento`, `genero`), emergency contact, and medical information (`condiciones_medicas`, `seguro_medico`, `grupo_sanguineo`).
+    4. Once registered, a coordinator can enroll the student in a schedule. The billing engine then generates a `cuentas_por_cobrar` record for the first billing period.
+  </Step>
+  <Step title="Setting up a new class">
+    1. Confirm the **sede** and **cancha** exist under **Locations**.
+    2. Confirm the **training level** exists under **Levels**.
+    3. Confirm the **coordinator** is registered under **Teachers**.
+    4. Go to **Schedules** and click **Programar Clase**.
+    5. Fill in `sede_id`, `cancha_id`, `coordinador_id`, `nivel_id`, `dia_semana` (1–7), `hora_inicio`, `hora_fin`, and `capacidad_max`.
+    6. Submit. The system enforces the unique constraint `(cancha_id, dia_semana, hora_inicio)` — no two classes can share the same court, day, and start time.
+  </Step>
+  <Step title="Validating a student payment">
+    1. Go to **Payment Validation** (`/dashboard/admin/payment-validation`).
+    2. The list shows payment reports with `estado_validacion = PENDIENTE`.
+    3. Open a record to view the student's uploaded voucher image (`url_comprobante`).
+    4. Set the action to **APROBAR** or **RECHAZAR**, confirm the `monto_real_confirmado`, add optional `notas`, and click **Finalizar Verificación**.
+    5. The system posts to `POST /pagos/validar` and updates the linked `cuentas_por_cobrar` record.
+  </Step>
+</Steps>
+
+<Note>
+  All admin routes require an active session with the **Administrador** role. Unauthorized access redirects to the login page.
+</Note>

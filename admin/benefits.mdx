@@ -1,0 +1,163 @@
+---
+title: "Benefits & Discounts"
+description: "Create benefit types, apply discounts to student accounts, and manage the scholarship catalog for Academia Gema."
+---
+
+The **Benefits** system has two parts:
+
+1. **AdminCreateBenefits** (`/dashboard/admin/create-benefits`) — Define and manage the catalog of benefit types (scholarship types, discount rules)
+2. **AdminBenefits** (`/dashboard/admin/benefits`) — Apply a benefit to a specific student
+
+---
+
+## Benefit types (tipos-beneficio)
+
+Benefit types define named discount rules that can be applied to student accounts. Each type specifies whether the discount is a percentage or a fixed amount.
+
+### Benefit type fields
+
+| Field | Type | Description |
+|---|---|---|
+| `nombre` | string | Display name — e.g., `BECA EXCELENCIA`, `DESCUENTO FAMILIAR` |
+| `es_porcentaje` | boolean | `true` = percentage discount; `false` = fixed amount discount |
+| `valor_por_defecto` | decimal | Default discount value (percent or PEN amount) |
+| `activo` | boolean | Whether this benefit type is available for assignment |
+
+### Creating a benefit type
+
+<Steps>
+  <Step title="Go to Benefit Types">
+    Navigate to `/dashboard/admin/create-benefits`.
+  </Step>
+  <Step title="Fill in the form">
+    - Enter a **Nombre Comercial** (all caps recommended — the field auto-uppercases).
+    - Select **Porcentaje** or **Monto Fijo** for the discount calculation type.
+    - Enter the **Valor por Defecto** (e.g., `20` for 20% or `50.00` for S/ 50 off).
+  </Step>
+  <Step title="Submit">
+    ```http
+    POST /tipos-beneficio
+    Content-Type: application/json
+
+    {
+      "nombre": "BECA EXCELENCIA",
+      "es_porcentaje": true,
+      "valor_por_defecto": 20
+    }
+    ```
+  </Step>
+</Steps>
+
+### Editing a benefit type
+
+Click the edit icon on a benefit row. The form pre-fills and submits to:
+
+```http
+PUT /tipos-beneficio/:id
+Content-Type: application/json
+
+{
+  "nombre": "BECA EXCELENCIA PLUS",
+  "es_porcentaje": true,
+  "valor_por_defecto": 25
+}
+```
+
+### Disabling and reactivating benefit types
+
+Benefit types can be archived without deletion:
+
+- **Disable** (EyeOff icon): Sets `activo = false`. The benefit moves to the **Archivo** section and disappears from the assignment dropdown.
+- **Reactivate** (RotateCcw icon): Sets `activo = true`.
+
+```http
+PUT /tipos-beneficio/:id
+Content-Type: application/json
+
+{ "activo": false }
+```
+
+---
+
+## Applying a benefit to a student
+
+The **AdminBenefits** page uses intelligent routing to determine whether to apply the discount immediately or reserve it for the next billing cycle.
+
+<Steps>
+  <Step title="Search for the student">
+    Type a name or document number in the search box. The system shows a filtered list of all alumni. Click a student card to select them.
+  </Step>
+  <Step title="Automatic debt detection">
+    Once you select a student, the system checks for an active `cuentas_por_cobrar` with `estado = 'PENDIENTE'`:
+
+    ```http
+    GET /cuentas-por-cobrar/historial/:alumno_id
+    ```
+
+    - **Orange banner** — the student has an active debt. The discount will be applied immediately to that account.
+    - **Blue banner** — no active debt. The discount will be reserved for the next enrollment cycle.
+  </Step>
+  <Step title="Select the benefit type">
+    Choose from the dropdown of active `tipos_beneficio`. The dropdown shows the benefit name and its value — e.g., `BECA EXCELENCIA (20% dcto.)` or `DESCUENTO FAMILIAR (S/ 50 menos)`.
+  </Step>
+  <Step title="Enter the reason">
+    Add a `motivo` for the benefit assignment (e.g., `BECA POR EXCELENCIA DEPORTIVA`).
+  </Step>
+  <Step title="Submit">
+    The submit button adapts based on the debt status:
+
+    **If active debt (orange path):**
+    ```http
+    POST /descuentos/aplicar
+    Content-Type: application/json
+
+    {
+      "cuenta_id": 88,
+      "tipo_beneficio_id": 3,
+      "admin_id": 5,
+      "motivo": "Beca por rendimiento académico"
+    }
+    ```
+
+    **If no active debt (blue path):**
+    ```http
+    POST /beneficioPendiente
+    Content-Type: application/json
+
+    {
+      "alumno_id": 42,
+      "tipo_beneficio_id": 3,
+      "asignado_por": 5,
+      "motivo": "Beca para próximo mes"
+    }
+    ```
+  </Step>
+</Steps>
+
+---
+
+## Viewing pending benefits
+
+Benefits that are reserved for a future billing cycle are stored as `beneficioPendiente` records. Query them with:
+
+```http
+GET /beneficioPendiente
+```
+
+---
+
+## Summary of benefit-related endpoints
+
+```http
+# Benefit type catalog
+GET /tipos-beneficio
+POST /tipos-beneficio
+PUT /tipos-beneficio/:id
+
+# Immediate discount application
+POST /descuentos/aplicar
+
+# Pending (future) benefit reservation
+GET /beneficioPendiente
+POST /beneficioPendiente
+```

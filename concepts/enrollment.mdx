@@ -1,0 +1,104 @@
+---
+title: "Enrollment"
+description: "How students enroll in class slots and how enrollment status is managed throughout the student lifecycle."
+---
+
+Enrollment is the mechanism that links a student to a specific weekly class slot. Once enrolled, the student appears on the coordinator's attendance list for every session of that slot.
+
+## Data model
+
+```sql
+CREATE TABLE inscripciones (
+    id                SERIAL PRIMARY KEY,
+    alumno_id         INT NOT NULL REFERENCES alumnos(usuario_id),
+    horario_id        INT NOT NULL REFERENCES horarios_clases(id),
+    fecha_inscripcion DATE DEFAULT CURRENT_DATE,
+    estado            VARCHAR(20) DEFAULT 'ACTIVO'
+                        CHECK (estado IN ('ACTIVO', 'SUSPENDIDO', 'RETIRADO')),
+    actualizado_en    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT unica_inscripcion_alumno UNIQUE (alumno_id, horario_id)
+);
+```
+
+The `CONSTRAINT unica_inscripcion_alumno UNIQUE (alumno_id, horario_id)` prevents a student from enrolling in the same class slot more than once.
+
+## Enrollment status lifecycle
+
+Every enrollment record has a `estado` field with one of three values:
+
+<AccordionGroup>
+  <Accordion title="ACTIVO">
+    The default state when a student successfully enrolls. An active enrollment means:
+
+    - The student appears on the coordinator's attendance list for every session of the slot.
+    - The student's seat counts toward the slot's `capacidad_max`.
+    - The student can view the enrollment in their **Mis inscripciones** dashboard.
+  </Accordion>
+
+  <Accordion title="SUSPENDIDO">
+    The enrollment is temporarily paused. A suspended student:
+
+    - No longer appears as active in the attendance list.
+    - Their seat may be freed for a new enrollment depending on business rules.
+    - Can be reactivated back to `ACTIVO` by an administrator.
+  </Accordion>
+
+  <Accordion title="RETIRADO">
+    The enrollment is permanently ended. A withdrawn student:
+
+    - Is removed from the active roster for that slot.
+    - Historical attendance records linked to the enrollment are preserved.
+    - Cannot be re-enrolled in the same slot (the unique constraint would require a new record).
+  </Accordion>
+</AccordionGroup>
+
+The `actualizado_en` column is automatically refreshed by the `trg_actualizar_inscripciones` trigger whenever the record changes.
+
+## API endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/inscripciones` | List all enrollments (admin) |
+| `POST` | `/inscripciones` | Enroll a student in a slot |
+| `PATCH` | `/inscripciones/:id` | Update enrollment status |
+| `DELETE` | `/inscripciones/:id` | Remove an enrollment |
+
+## Student enrollment flow
+
+<Steps>
+  <Step title="Browse available slots">
+    The student navigates to `/dashboard/student/enrollment`. The page fetches active schedules from `GET /horarios` and displays them filtered by day and level.
+  </Step>
+
+  <Step title="Select a class slot">
+    The student picks a slot that fits their schedule. The interface shows the location, court, coordinator, level, day, time, and remaining capacity.
+  </Step>
+
+  <Step title="Submit enrollment">
+    The frontend posts to `POST /inscripciones` with `alumno_id` and `horario_id`. The backend:
+
+    1. Verifies the student is not already enrolled in that slot (unique constraint).
+    2. Checks that current enrollment count is below `capacidad_max`.
+    3. Creates the record with `estado = 'ACTIVO'`.
+  </Step>
+
+  <Step title="Confirm enrollment">
+    The student can verify their active enrollments at `/dashboard/student/myRegistrations`, which lists all their `inscripciones` records with status badges.
+  </Step>
+</Steps>
+
+## Capacity enforcement
+
+When the number of active enrollments for a `horario_id` equals its `capacidad_max`, the `POST /inscripciones` endpoint rejects additional enrollments. The admin can increase `capacidad_max` for that slot if needed — see [Scheduling system](/concepts/schedules).
+
+## Admin enrollment management
+
+Administrators can manage all enrollments from `/dashboard/admin/students`. Actions available:
+
+- Enroll a student in a slot on their behalf.
+- Change a student's enrollment `estado` between `ACTIVO`, `SUSPENDIDO`, and `RETIRADO`.
+- View a student's full enrollment history.
+
+<Note>
+  Attendance records (`registros_asistencia`) are linked to `inscripciones.id`, not directly to `alumno_id`. Changing enrollment status does not delete historical attendance data.
+</Note>

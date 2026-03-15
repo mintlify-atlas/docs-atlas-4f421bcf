@@ -1,0 +1,102 @@
+---
+title: "Payment Validation"
+description: "Step-by-step guide to reviewing and approving or rejecting student payment vouchers in Academia Gema."
+---
+
+When a student reports a payment, they upload a voucher image and submit it through the app. The **Payment Validation** workflow is how you review, confirm, and finalize those reports.
+
+## How the workflow operates
+
+<Steps>
+  <Step title="Student submits a payment report">
+    The student calls `POST /pagos/reportar` with their `codigo_operacion`, `monto_pagado`, `metodo_pago_id`, and an image file uploaded to Cloudinary. This creates a payment record with `estado_validacion = 'PENDIENTE'`.
+  </Step>
+  <Step title="Admin reviews the pending list">
+    Go to **Payment Validation** (`/dashboard/admin/payment-validation`). The default filter shows only `PENDIENTE` records. Each card displays the student's name, document number, email, phone, amount, and payment method.
+  </Step>
+  <Step title="Open a payment detail">
+    Click on a payment card to open the validation detail view (`AdminPaymentValidation`). You see:
+    - **Emisor del Pago** — student name and the billing detail (`cuentas_por_cobrar.detalle_adicional`)
+    - **Comprobante** — the voucher image loaded from `url_comprobante`
+    - **Resumen** — reported amount, payment method, and date
+  </Step>
+  <Step title="Set the validation decision">
+    In the **Validar Operación** panel on the right, toggle the decision:
+    - Click **Aprobar** (green) to approve
+    - Click **Rechazar** (red) to reject
+  </Step>
+  <Step title="Confirm the real amount">
+    Edit the **Monto Real Confirmado (S/)** field if the amount in the voucher differs from what the student reported. This value is what gets applied to the `cuentas_por_cobrar` record.
+  </Step>
+  <Step title="Add optional notes">
+    Enter any administrative notes in the **Notas Administrativas** textarea. These are stored in `notas_validacion` and are visible to the admin team.
+  </Step>
+  <Step title="Finalize">
+    Click **Finalizar Verificación**. The button is disabled while `estado_validacion = 'PENDIENTE'` — you must explicitly choose Aprobar or Rechazar first.
+
+    The form submits:
+
+    ```http
+    POST /pagos/validar
+    Content-Type: application/json
+
+    {
+      "pago_id": 42,
+      "accion": "APROBAR",
+      "usuario_admin_id": 5,
+      "notas": "Verificado con extracto bancario.",
+      "monto_real_confirmado": 180.00
+    }
+    ```
+  </Step>
+</Steps>
+
+---
+
+## Validation payload reference
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `pago_id` | integer | Yes | ID of the payment record being validated |
+| `accion` | string | Yes | `"APROBAR"` or `"RECHAZAR"` |
+| `usuario_admin_id` | integer | Yes | ID of the admin performing the validation |
+| `notas` | string | No | Internal administrative notes |
+| `monto_real_confirmado` | decimal | Yes | The confirmed real amount in PEN |
+
+---
+
+## Effect on cuentas_por_cobrar
+
+| Action | Effect |
+|---|---|
+| `APROBAR` | The linked `cuentas_por_cobrar` status changes to `PAGADO` (if full) or `PARCIAL` (if partial). |
+| `RECHAZAR` | The `cuentas_por_cobrar` status is unchanged. The student's account remains `PENDIENTE`. |
+
+<Note>
+  If a payment is blocked (`bloqueado_por_asistencia = true`), the API will return an error when you attempt to approve it. Resolve the student's pending recovery sessions first.
+</Note>
+
+---
+
+## Viewing payment statistics
+
+The `AdminPaymentStats` widget at the top of the payments page provides:
+
+- **Por Validar** — count of payments pending validation for the selected year
+- **Análisis Mensual de Ingresos Reales** — a 12-month bar chart showing approved payment totals per month, with the peak month value displayed in the top-right
+
+Hover over any month bar to see the exact amount validated that month.
+
+---
+
+## Rejecting a payment: what happens next
+
+When you reject a payment:
+1. The `estado_validacion` is set to `RECHAZADO`.
+2. The student's `cuentas_por_cobrar` remains `PENDIENTE`.
+3. The student receives a notification (if the notifications system is active).
+4. The student must upload a corrected voucher and resubmit via `POST /pagos/reportar`.
+
+<Warning>
+  Rejected payments are not deleted. They remain in the payment history with status `RECHAZADO`. The admin can always reference the original submission.
+</Warning>

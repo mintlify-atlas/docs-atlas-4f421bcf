@@ -1,0 +1,117 @@
+---
+title: "Guest Pass Management"
+description: "Issue walk-in class passes to non-enrolled visitors using the Taquilla Express feature."
+---
+
+Guest passes let you sell a single class session to a visitor who is not a registered student. The **Taquilla Express** feature (`/dashboard/admin/guest-passes`) handles this with a quick-sale form that registers the payment and logs the visit in seconds.
+
+## How guest passes work
+
+The system uses a **wildcard user** (`usuario_comodín`) with DNI `00000000` and email `invitado@gema.com` to represent any walk-in guest. All guest pass sales are recorded against this user, keeping the student database clean.
+
+The wildcard user must be initialized before the Taquilla Express form becomes active.
+
+---
+
+## System setup: the wildcard user
+
+<Steps>
+  <Step title="Check the wildcard status">
+    When you open the Guest Passes page, the system automatically checks for the wildcard user by calling `GET /usuarios/dni/00000000`.
+
+    - If found, the sidebar shows **Sistema Operativo** (green).
+    - If not found, the sidebar shows **Requiere Configuración** (orange).
+  </Step>
+  <Step title="Create the wildcard (if needed)">
+    Click **Crear Comodín**. This registers the wildcard user:
+
+    ```http
+    POST /usuarios/register
+    Content-Type: application/json
+
+    {
+      "email": "invitado@gema.com",
+      "password": "GemaInvitado2026!",
+      "nombres": "Pase",
+      "apellidos": "Invitado Gema",
+      "rol_id": "alumno",
+      "tipo_documento_id": "DNI",
+      "numero_documento": "00000000",
+      "telefono_personal": "+51000000000",
+      "fecha_nacimiento": "2000-01-01",
+      "genero": "M",
+      "datosRolEspecifico": {
+        "condiciones_medicas": "Ninguna",
+        "seguro_medico": "Ninguno",
+        "grupo_sanguineo": "O+",
+        "direccion": {
+          "direccion_completa": "Sede Club Gema",
+          "distrito": "San Martín de Porres"
+        }
+      }
+    }
+    ```
+
+    This only needs to be done once per environment.
+  </Step>
+</Steps>
+
+---
+
+## Issuing a guest pass
+
+<Steps>
+  <Step title="Fill in visitor details">
+    | Field | Required | Notes |
+    |---|---|---|
+    | `nombreVisitante` | Yes | Walk-in visitor's name |
+    | `telefonoVisitante` | No | Optional — for promotions |
+  </Step>
+  <Step title="Select the class day">
+    The **Horario de la Clase** dropdown shows active schedules (`activo = true`), deduplicated by `dia_semana`. Select the day of the class the visitor is attending. Days are sorted Monday (1) through Sunday (7).
+  </Step>
+  <Step title="Select payment method">
+    Choose from the active payment methods fetched via `GET /metodos-pago`. The four standard methods are YAPE, PLIN, EFECTIVO, and TRANSFERENCIA.
+  </Step>
+  <Step title="Enter the amount">
+    Enter the `montoCobrado` (amount charged) in S/. The field only accepts values greater than `0`.
+  </Step>
+  <Step title="Click 'Registrar Venta Express'">
+    The form submits to:
+
+    ```http
+    POST /pagos/venta-express
+    Content-Type: application/json
+
+    {
+      "alumno_id": <wildcard_user_id>,
+      "adminId": <logged_in_admin_id>,
+      "monto": 25.00,
+      "metodo_pago_id": 4,
+      "nombre_visitante": "Juan Pérez",
+      "telefono": "+51987654321",
+      "horario_texto": "LUNES"
+    }
+    ```
+
+    On success, a confirmation toast shows `Pago de S/ 25.00 registrado para Juan Pérez`. The form resets automatically for the next visitor.
+  </Step>
+</Steps>
+
+---
+
+## Form validation
+
+- `nombreVisitante` and the schedule selector are required fields.
+- `montoCobrado` must be a number greater than 0.
+- The wildcard user must exist — if not, the form is dimmed and non-interactive until you create the wildcard.
+
+---
+
+## Tracking guest pass sales
+
+All guest pass sales appear in the **Payment Management** module (`/dashboard/admin/payments`) associated with the wildcard user `Pase Invitado Gema`. Filter the payments list by student name `Invitado` to see a full history of walk-in sales.
+
+<Info>
+  Guest passes do not generate a `cuentas_por_cobrar` record or affect any student's enrollment or attendance tracking. They are express sales only.
+</Info>

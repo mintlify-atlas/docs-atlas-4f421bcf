@@ -1,0 +1,233 @@
+---
+title: Payments API
+description: Endpoints for reporting and validating payments, managing accounts receivable, and accessing the pricing catalog.
+---
+
+Payment endpoints cover the full financial cycle: students report payments, admins validate them, and accounts receivable tracks what is owed.
+
+---
+
+## GET /pagos/gestion-admin
+
+Returns the full list of payments for admin review, including pending validations.
+
+**Authentication:** Required (admin).
+
+### Response
+
+<ResponseField name="success" type="boolean" required />
+<ResponseField name="data" type="object[]">
+  <Expandable title="payment object">
+    <ResponseField name="id" type="number">Payment ID.</ResponseField>
+    <ResponseField name="cuenta_id" type="number">Account receivable ID this payment applies to.</ResponseField>
+    <ResponseField name="monto_pagado" type="number">Amount paid.</ResponseField>
+    <ResponseField name="fecha_pago" type="string">ISO 8601 payment timestamp.</ResponseField>
+    <ResponseField name="metodo_pago" type="string">Payment method string.</ResponseField>
+    <ResponseField name="referencia_transaccion" type="string">Transaction reference or voucher number.</ResponseField>
+  </Expandable>
+</ResponseField>
+
+---
+
+## GET /pagos/alumno/:id
+
+Returns the payment history for a specific student.
+
+**Authentication:** Required.
+
+### Path parameters
+
+<ParamField path="id" type="number" required>
+  The student's user ID.
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean" required />
+<ResponseField name="data" type="object[]">
+  Array of payment records for the student.
+</ResponseField>
+
+---
+
+## POST /pagos/reportar
+
+Allows a student to report a payment they have made. The payment is created in a pending state until an admin validates it.
+
+**Authentication:** Required (student).
+
+### Request body
+
+<ParamField body="cuenta_id" type="number" required>
+  The accounts receivable ID (`cuentas_por_cobrar.id`) this payment covers.
+</ParamField>
+
+<ParamField body="monto_pagado" type="number" required>
+  The amount paid, as a decimal (e.g. `150.00`).
+</ParamField>
+
+<ParamField body="metodo_pago" type="string" required>
+  Payment method used (e.g. `Transferencia`, `Efectivo`, `Yape`).
+</ParamField>
+
+<ParamField body="referencia_transaccion" type="string">
+  Transaction reference number or voucher code.
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean" required />
+<ResponseField name="data" type="object">
+  The reported payment record in pending state.
+</ResponseField>
+
+---
+
+## POST /pagos/validar
+
+Allows an admin to approve or reject a reported payment.
+
+**Authentication:** Required (admin).
+
+### Request body
+
+<ParamField body="pago_id" type="number" required>
+  The payment ID to validate.
+</ParamField>
+
+<ParamField body="action" type="string" required>
+  The validation decision. Must be `approve` or `reject`.
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean" required />
+<ResponseField name="data" type="object">
+  The updated payment record.
+</ResponseField>
+
+---
+
+## GET /cuentas-por-cobrar
+
+Returns the full accounts receivable list. Used by admins to see outstanding balances.
+
+**Authentication:** Required (admin).
+
+### Response
+
+<ResponseField name="success" type="boolean" required />
+<ResponseField name="data" type="object[]">
+  <Expandable title="account object">
+    <ResponseField name="id" type="number">Account ID.</ResponseField>
+    <ResponseField name="alumno_id" type="number">Student user ID this account belongs to.</ResponseField>
+    <ResponseField name="concepto" type="string">Description of the charge (e.g. `Mensualidad Julio 2025`).</ResponseField>
+    <ResponseField name="monto" type="number">Total amount charged.</ResponseField>
+    <ResponseField name="fecha_vencimiento" type="string">Due date in `YYYY-MM-DD` format.</ResponseField>
+    <ResponseField name="estado" type="string">`PENDIENTE`, `PARCIAL`, `PAGADO`, `VENCIDO`, or `CANCELADO`.</ResponseField>
+    <ResponseField name="creado_en" type="string">ISO 8601 creation timestamp.</ResponseField>
+    <ResponseField name="actualizado_en" type="string">ISO 8601 last-update timestamp.</ResponseField>
+  </Expandable>
+</ResponseField>
+
+---
+
+## GET /cuentas-por-cobrar/historial/:id
+
+Returns the accounts receivable history for a specific student.
+
+**Authentication:** Required.
+
+### Path parameters
+
+<ParamField path="id" type="number" required>
+  The student's user ID.
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean" required />
+<ResponseField name="data" type="object[]">
+  Array of account records for the student.
+</ResponseField>
+
+---
+
+## POST /cuentas-por-cobrar
+
+Creates a new account receivable entry for a student. Used by admins to generate monthly charges.
+
+**Authentication:** Required (admin).
+
+### Request body
+
+<ParamField body="alumno_id" type="number" required>
+  The student's user ID.
+</ParamField>
+
+<ParamField body="concepto" type="string" required>
+  Description of the charge (max 150 characters).
+</ParamField>
+
+<ParamField body="monto" type="number" required>
+  Amount to charge as a decimal.
+</ParamField>
+
+<ParamField body="fecha_vencimiento" type="string" required>
+  Due date in `YYYY-MM-DD` format.
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean" required />
+<ResponseField name="data" type="object">
+  The newly created account receivable.
+</ResponseField>
+
+---
+
+## GET /catalogo/vigentes
+
+Returns all active pricing plans that are currently valid. This is a public endpoint used on the landing page.
+
+**Authentication:** None required.
+
+### Response
+
+<ResponseField name="success" type="boolean" required />
+<ResponseField name="data" type="object[]">
+  Array of currently valid pricing plan objects.
+</ResponseField>
+
+---
+
+## GET /catalogo/activos
+
+Returns all active catalog items. Used by admins for full catalog management.
+
+**Authentication:** Required (admin).
+
+### Response
+
+<ResponseField name="success" type="boolean" required />
+<ResponseField name="data" type="object[]">
+  Array of all active catalog items.
+</ResponseField>
+
+---
+
+## GET /metodos-pago
+
+Returns all configured payment methods (e.g. `Transferencia`, `Efectivo`, `Yape`).
+
+**Authentication:** Required.
+
+### Response
+
+<ResponseField name="success" type="boolean" required />
+<ResponseField name="data" type="object[]">
+  <Expandable title="payment method object">
+    <ResponseField name="id" type="number">Method ID.</ResponseField>
+    <ResponseField name="nombre" type="string">Display name of the payment method.</ResponseField>
+  </Expandable>
+</ResponseField>

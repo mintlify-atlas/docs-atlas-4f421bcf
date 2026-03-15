@@ -1,0 +1,230 @@
+---
+title: Attendance API
+description: Endpoints for recording and querying class attendance, student statistics, and injury tracking.
+---
+
+Attendance endpoints manage the `registros_asistencia` table and the injury (`lesiones`) subsystem. Coordinators use these to mark who attended each class; students and admins can query the history.
+
+---
+
+## GET /asistencias
+
+Returns all attendance records. Accessible by admins and coordinators.
+
+**Authentication:** Required (admin or coordinator).
+
+### Response
+
+<ResponseField name="success" type="boolean" required />
+<ResponseField name="data" type="object[]">
+  <Expandable title="attendance record">
+    <ResponseField name="id" type="number">Record ID.</ResponseField>
+    <ResponseField name="inscripcion_id" type="number">The enrollment this record belongs to.</ResponseField>
+    <ResponseField name="fecha" type="string">Class date in `YYYY-MM-DD` format.</ResponseField>
+    <ResponseField name="estado" type="string">`PRESENTE`, `AUSENTE`, `TARDE`, or `JUSTIFICADO`.</ResponseField>
+    <ResponseField name="registrado_en" type="string">ISO 8601 timestamp when the record was created.</ResponseField>
+  </Expandable>
+</ResponseField>
+
+---
+
+## POST /asistencias
+
+Creates an attendance record for a student on a specific date.
+
+**Authentication:** Required (coordinator or admin).
+
+### Request body
+
+<ParamField body="inscripcion_id" type="number" required>
+  The enrollment ID (`inscripciones.id`) the attendance applies to.
+</ParamField>
+
+<ParamField body="fecha" type="string" required>
+  The class date in `YYYY-MM-DD` format.
+</ParamField>
+
+<ParamField body="estado" type="string" required>
+  Attendance status. One of: `PRESENTE`, `AUSENTE`, `TARDE`, `JUSTIFICADO`.
+</ParamField>
+
+<Warning>
+  The combination of `inscripcion_id` and `fecha` must be unique. The `asistencia_unica_diaria` constraint prevents duplicate records for the same student on the same day.
+</Warning>
+
+### Response
+
+<ResponseField name="success" type="boolean" required />
+<ResponseField name="data" type="object">
+  The created attendance record.
+</ResponseField>
+
+---
+
+## PUT /asistencias/:id
+
+Updates an existing attendance record, for example to change `AUSENTE` to `JUSTIFICADO`.
+
+**Authentication:** Required (coordinator or admin).
+
+### Path parameters
+
+<ParamField path="id" type="number" required>
+  The attendance record ID to update.
+</ParamField>
+
+### Request body
+
+<ParamField body="estado" type="string" required>
+  New status: `PRESENTE`, `AUSENTE`, `TARDE`, or `JUSTIFICADO`.
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean" required />
+<ResponseField name="data" type="object">
+  The updated attendance record.
+</ResponseField>
+
+---
+
+## GET /asistencias/alumno/:id
+
+Returns all attendance records for a specific student.
+
+**Authentication:** Required.
+
+### Path parameters
+
+<ParamField path="id" type="number" required>
+  The student's user ID.
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean" required />
+<ResponseField name="data" type="object[]">
+  Array of attendance records for the student.
+</ResponseField>
+
+---
+
+## GET /asistencias/alumno/:id/estadisticas
+
+Returns attendance statistics for a specific student (totals by status, attendance percentage, etc.).
+
+**Authentication:** Required.
+
+### Path parameters
+
+<ParamField path="id" type="number" required>
+  The student's user ID.
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean" required />
+<ResponseField name="data" type="object">
+  <Expandable title="statistics object">
+    <ResponseField name="total" type="number">Total number of class sessions recorded.</ResponseField>
+    <ResponseField name="presentes" type="number">Count of `PRESENTE` records.</ResponseField>
+    <ResponseField name="ausentes" type="number">Count of `AUSENTE` records.</ResponseField>
+    <ResponseField name="tardes" type="number">Count of `TARDE` records.</ResponseField>
+    <ResponseField name="justificados" type="number">Count of `JUSTIFICADO` records.</ResponseField>
+    <ResponseField name="porcentaje_asistencia" type="number">Attendance percentage as a decimal (0-100).</ResponseField>
+  </Expandable>
+</ResponseField>
+
+---
+
+## Additional attendance sub-routes
+
+The `asistenciaService` in `src/services/asistencia.service.js` also uses two additional endpoints:
+
+<AccordionGroup>
+  <Accordion title="GET /asistencias/agenda">
+    Returns the attendance agenda for the authenticated coordinator. Lists today's or upcoming classes with their student rosters.
+
+    **Authentication:** Required (coordinator).
+  </Accordion>
+
+  <Accordion title="POST /asistencias/masiva">
+    Marks attendance for multiple students in a single request.
+
+    **Authentication:** Required (coordinator).
+
+    **Request body:** `{ asistencias: [{ id: number, estado: string }] }` where each `id` is an existing attendance record ID.
+  </Accordion>
+
+  <Accordion title="PATCH /asistencias/:id">
+    Updates a single attendance record (used for individual status corrections). Accepts `estado` and an optional `comentario` string.
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## GET /lesiones
+
+Returns all injury records. Admin view.
+
+**Authentication:** Required (admin).
+
+### Response
+
+<ResponseField name="success" type="boolean" required />
+<ResponseField name="data" type="object[]">
+  Array of all injury records.
+</ResponseField>
+
+---
+
+## GET /lesiones/alumno/:id
+
+Returns injury records for a specific student.
+
+**Authentication:** Required.
+
+### Path parameters
+
+<ParamField path="id" type="number" required>
+  The student's user ID.
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean" required />
+<ResponseField name="data" type="object[]">
+  Array of injury records for the student.
+</ResponseField>
+
+---
+
+## POST /lesiones
+
+Creates an injury report for a student. Students submit this via `lesionService.crearSolicitud`; admins can also create records directly.
+
+**Authentication:** Required.
+
+### Request body
+
+<ParamField body="descripcion" type="string" required>
+  Description of the injury.
+</ParamField>
+
+<ParamField body="urlEvidencia" type="string">
+  URL to supporting evidence (image or document uploaded via Cloudinary).
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean" required />
+<ResponseField name="data" type="object">
+  The created injury record.
+</ResponseField>
+
+<Note>
+  Additional injury sub-routes available from `lesionService`:
+  - `GET /lesiones/mis-solicitudes` — student's own injury requests.
+  - `GET /lesiones/pendientes` — pending injury requests for admin review.
+  - `POST /lesiones/:id/evaluar` — admin evaluates an injury request with body `{ estado, notas, tipo, fechaInicio, fechaFin }`.
+</Note>

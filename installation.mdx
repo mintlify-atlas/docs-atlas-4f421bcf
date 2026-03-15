@@ -1,0 +1,213 @@
+---
+title: "Installation"
+description: "Full installation, configuration, and deployment guide for the Academia Gema frontend."
+---
+
+## System requirements
+
+| Requirement | Minimum version |
+|-------------|----------------|
+| Node.js | `>=22.12.0` |
+| npm | Bundled with Node.js |
+| Backend API | Any URL reachable from the browser |
+| PostgreSQL | Any version compatible with the backend |
+
+<Tip>
+  Run `node -v` to check your current Node.js version. If you need to install or upgrade, use [nvm](https://github.com/nvm-sh/nvm) or the official installer at nodejs.org.
+</Tip>
+
+## Frontend installation
+
+<Steps>
+  <Step title="Navigate to the frontend directory">
+    The React application lives in the `Front/` subdirectory of the repository.
+
+    ```bash
+    cd AcademiaGema/Front
+    ```
+  </Step>
+
+  <Step title="Install dependencies">
+    ```bash
+    npm install
+    ```
+
+    This installs all packages listed in `package.json`:
+
+    | Package | Version | Purpose |
+    |---------|---------|----------|
+    | `react` | `^19.2.0` | UI rendering |
+    | `react-router-dom` | `^7.12.0` | Client-side routing |
+    | `tailwindcss` | `^3.4.19` | Utility-first CSS |
+    | `vite` | `^7.2.4` | Build tool and dev server |
+    | `recharts` | `^3.8.0` | Charts and analytics |
+    | `framer-motion` | `^12.34.0` | Animations |
+    | `js-cookie` | `^3.0.5` | Cookie-based session storage |
+    | `date-fns` | `^4.1.0` | Date formatting |
+    | `xlsx` / `xlsx-js-style` | `^0.18.5` / `^1.2.0` | Excel export |
+    | `lucide-react` | `^0.562.0` | Icons |
+    | `sweetalert2` | `^11.26.21` | Modal dialogs |
+    | `react-hot-toast` | `^2.6.0` | Toast notifications |
+  </Step>
+</Steps>
+
+## Tailwind CSS setup
+
+Tailwind CSS is pre-configured. The project includes `tailwind.config.js` and `postcss.config.js` at the root of `Front/`.
+
+<CodeGroup>
+
+```javascript tailwind.config.js
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: [
+    "./index.html",
+    "./src/**/*.{js,ts,jsx,tsx}",
+  ],
+  theme: {
+    extend: {},
+  },
+  plugins: [],
+}
+```
+
+```javascript postcss.config.js
+export default {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
+  },
+}
+```
+
+</CodeGroup>
+
+Tailwind scans all files matching `./src/**/*.{js,ts,jsx,tsx}` and `./index.html` to generate only the CSS classes your code uses.
+
+## Vite configuration
+
+```javascript vite.config.js
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+
+export default defineConfig({
+  plugins: [react()],
+  preview: {
+    allowedHosts: true,
+    port: process.env.PORT || 8080,
+    host: '0.0.0.0'
+  },
+  server: {
+    allowedHosts: true
+  }
+})
+```
+
+- The `preview` server binds to `0.0.0.0` and reads the `PORT` environment variable, defaulting to `8080`. This is required for Railway deployments.
+- `allowedHosts: true` permits requests from any host, enabling cloud deployment environments to proxy correctly.
+
+## Environment variables
+
+Create a `.env` file in the `Front/` directory:
+
+```bash
+VITE_API_URL=https://your-backend-api-url.com
+```
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `VITE_API_URL` | Yes | Base URL for all REST API calls. No trailing slash. |
+
+<Warning>
+  Vite only exposes variables prefixed with `VITE_` to the browser bundle. Never put secrets in `.env` — they are included in the client-side build output.
+</Warning>
+
+For deployment platforms, set `VITE_API_URL` as an environment variable in the platform's settings UI instead of committing a `.env` file.
+
+## Build for production
+
+```bash
+npm run build
+```
+
+Vite compiles the application into `dist/`, producing optimized, minified static files. The `dist/` directory contains everything needed to serve the frontend.
+
+## Running a production preview
+
+To test the production build locally before deploying:
+
+```bash
+npm run preview
+# or
+npm start
+```
+
+Both commands run `vite preview --host 0.0.0.0 --port ${PORT:-4173}`, serving the `dist/` output.
+
+## Deployment
+
+<Tabs>
+  <Tab title="Netlify">
+    The repository includes a `netlify.toml` at the root of `Front/`:
+
+    ```toml
+    [build]
+      base    = ""
+      publish = "dist"
+      command = "npm run build"
+    ```
+
+    **Steps:**
+
+    1. Connect your GitHub repository to Netlify.
+    2. Set the **Base directory** to `Front`.
+    3. Add the `VITE_API_URL` environment variable in **Site settings → Environment variables**.
+    4. Deploy. Netlify runs `npm run build` and publishes the `dist/` folder.
+
+    <Note>
+      Because Academia Gema uses client-side routing with React Router, add a `_redirects` file to `public/` with `/* /index.html 200` so that direct URL access and page refreshes work correctly.
+    </Note>
+  </Tab>
+
+  <Tab title="Railway">
+    The repository includes `railway.json` at the root of `Front/`:
+
+    ```json
+    {
+      "build": {
+        "builder": "NIXPACKS"
+      },
+      "deploy": {
+        "startCommand": "npm run start",
+        "restartPolicyType": "ON_FAILURE"
+      }
+    }
+    ```
+
+    **Steps:**
+
+    1. Create a new Railway project and connect your GitHub repository.
+    2. Set the **Root directory** to `Front`.
+    3. Add `VITE_API_URL` and optionally `PORT` in the Railway environment variable panel.
+    4. Railway uses Nixpacks to build the project and runs `npm run start` (which calls `vite preview`) to serve it.
+
+    The preview server reads `process.env.PORT` from Railway's injected `PORT` variable and binds to `0.0.0.0` as required by the platform.
+  </Tab>
+</Tabs>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Run the app locally and log in for the first time
+  </Card>
+  <Card title="Roles and access control" icon="lock" href="/concepts/roles">
+    Understand how the three roles and route protection work
+  </Card>
+  <Card title="Environment variables" icon="key" href="/deployment/environment-variables">
+    Full reference for all deployment-time configuration
+  </Card>
+  <Card title="Database schema" icon="database" href="/database/schema">
+    Understand the PostgreSQL data model
+  </Card>
+</CardGroup>

@@ -1,0 +1,88 @@
+---
+title: "Recovery (Makeup) Sessions"
+description: "How to schedule makeup classes for sessions you missed, manage your recovery tickets, and understand the recovery limits at Club Gema."
+---
+
+Club Gema's recovery system lets you make up classes you missed. Each absence generates a **recovery ticket** (a pending slot). You use a ticket to book yourself into a future class session as a makeup.
+
+## Recovery limits
+
+There are two types of recovery tickets:
+
+<CardGroup cols={2}>
+  <Card title="Recuperaciones Normales" icon="activity">
+    Limited per billing cycle. The limit depends on your training frequency:
+    - **2–3 sessions/week** → up to 2 makeups
+    - **4+ sessions/week** → up to 4 makeups
+
+    When `recuperacion_usadas` reaches `limite_permitido`, a **Límite Alcanzado** badge appears.
+  </Card>
+  <Card title="Recuperaciones por Lesión" icon="shield-plus">
+    Unlimited. Available when you have an approved injury request. There is no cap on how many makeup sessions you can schedule under this type.
+  </Card>
+</CardGroup>
+
+<Warning>
+  Recovery benefits are suspended if you have an outstanding debt with status `PENDIENTE` or `PARCIAL`. Clear your balance first.
+</Warning>
+
+## Accessing the Recovery section
+
+Go to `/dashboard/student/recoveries`. The page loads three data sets in parallel:
+
+- **Pending tickets** from `GET /recuperaciones/pendientes` — absences eligible for a makeup.
+- **Available schedules** from the schedule service — all active class slots.
+- **Recovery history** from `GET /recuperaciones/historial` — all past and upcoming makeup sessions.
+
+The stats cards at the top show your current normal recovery usage vs. your limit, and confirm that injury recoveries have no limit.
+
+## Scheduling a makeup session
+
+<Steps>
+  <Step title="Go to the Agendar Clase tab">
+    The **Agendar Clase** tab is the default view. It shows the two-step booking flow.
+  </Step>
+  <Step title="Select a pending absence (ticket)">
+    In the first section, you see your pending recovery tickets — one card per absence you have not yet scheduled a makeup for. Click a ticket to select it.
+  </Step>
+  <Step title="Choose an available slot">
+    After selecting a ticket, a grid of available class slots appears for the next four weeks. Slots that overlap with your regular schedule or that you already have a makeup booked for are automatically excluded.
+
+    <Note>
+      Slots that fall within your current billing cycle on the same schedule as your regular classes are protected and not shown as available, to avoid double-booking your regular spot.
+    </Note>
+  </Step>
+  <Step title="Confirm the booking">
+    Click a slot. A confirmation toast appears showing the date and start time. Click **Confirmar** to proceed or **Cancelar** to pick a different slot.
+
+    The system posts to `POST /recuperaciones/agendar-recuperacion` with:
+
+    ```json
+    {
+      "alumnoId": "<your user ID>",
+      "recuperacionId": "<ticket ID>",
+      "horarioDestinoId": "<schedule ID>",
+      "fechaProgramada": "<ISO date>"
+    }
+    ```
+
+    A success toast **¡Clase agendada exitosamente!** confirms the booking. The page reloads with updated data.
+  </Step>
+</Steps>
+
+## Viewing recovery history
+
+Click the **Mi Historial** tab to see all your past and upcoming makeup sessions. Each entry is fetched from `GET /recuperaciones/historial`.
+
+### Recovery session statuses
+
+| Estado | Meaning |
+|---|---|
+| `PROGRAMADA` | Makeup class is scheduled for a future date |
+| `COMPLETADA` | You attended the makeup session |
+| `CANCELADA` | The makeup was cancelled |
+| `PENDIENTE` | Ticket exists but no makeup has been scheduled yet |
+
+## Cancelling a scheduled makeup
+
+In the **Mi Historial** tab, click the cancel button on a `PROGRAMADA` entry and confirm the prompt. The system calls `POST /recuperaciones/cancelar-recuperacion/:id`. The ticket returns to your **Pendientes** list so you can reschedule.

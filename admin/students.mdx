@@ -1,0 +1,159 @@
+---
+title: "Student Management"
+description: "View, search, and inspect every student in Academia Gema. Export the full directory to Excel and review academic, medical, and financial records."
+---
+
+The **Student Management** module (`/dashboard/admin/students`) is a read-only directory for the administrator. Student accounts are created through the registration flow; this panel lets you find any student, review their complete profile, and export data.
+
+## Viewing the student list
+
+The list view fetches all accounts with the `Alumno` role from `GET /usuarios/role/alumno`. Results are paginated at **10 students per page**. Use the search bar to filter in real time by:
+
+- `nombres` (first name)
+- `apellidos` (last name)
+- `numero_documento` (ID number)
+
+```http
+GET /usuarios/role/alumno
+```
+
+The response maps each user to the following display fields:
+
+| Field | Source |
+|---|---|
+| `id` | `user.id` |
+| `nombres` | `user.nombres` |
+| `apellidos` | `user.apellidos` |
+| `email` | `user.email` |
+| `tipo_documento_id` | `user.tipo_documento_id` (defaults to `'DNI'`) |
+| `numero_documento` | `user.numero_documento` |
+| `telefono_personal` | `user.telefono_personal` |
+| `fecha_nacimiento` | `user.fecha_nacimiento` (formatted as locale date) |
+| `genero` | `user.genero` (`'M'` or `'F'`) |
+| `contacto_emergencia` | `user.alumnos.alumnos_contactos[0].telefono` |
+| `parentesco` | `user.alumnos.alumnos_contactos[0].relacion` |
+
+---
+
+## Student profile (expediente académico)
+
+Click **Ver Perfil** on any row to open the full profile view. The profile is organized into two sections:
+
+### Personal & contact information
+
+| Field | Description |
+|---|---|
+| `nombres` + `apellidos` | Full name |
+| `tipo_documento_id` + `numero_documento` | Document type and number |
+| `fecha_nacimiento` | Date of birth |
+| `genero` | `Masculino` (M) or `Femenino` (F) |
+| `email` | Login email |
+| `telefono_personal` | Personal phone |
+| `contacto_emergencia` | Emergency contact phone (first entry in `alumnos_contactos`) |
+| `parentesco` | Relationship to emergency contact |
+
+### Sports health protocol
+
+Displayed under **Protocolo de Salud Deportiva**:
+
+| Field | Source | Description |
+|---|---|---|
+| `condiciones_medicas` | `user.alumnos.condiciones_medicas` | Medical conditions and allergies |
+| `seguro_medico` | `user.alumnos.seguro_medico` | Medical insurance |
+| `grupo_sanguineo` | `user.alumnos.grupo_sanguineo` | Blood type |
+
+<Warning>
+  Medical data is sensitive. Access to the student profile is restricted to users with the **Administrador** role.
+</Warning>
+
+---
+
+## Activating or deactivating a student
+
+The `activo` boolean on the `usuarios` table controls whether a student can log in and whether they appear in active enrollment queries. Update it via:
+
+```http
+PUT /usuarios/:id
+Content-Type: application/json
+
+{ "activo": false }
+```
+
+<Note>
+  Deactivating a student does not delete their records. Their payment history, attendance records, and enrollment data are preserved.
+</Note>
+
+---
+
+## Adding a new student
+
+Student accounts are registered by calling:
+
+```http
+POST /usuarios/register
+Content-Type: application/json
+
+{
+  "nombres": "María",
+  "apellidos": "García López",
+  "email": "maria.garcia@email.com",
+  "password": "SecurePass123!",
+  "rol_id": "alumno",
+  "tipo_documento_id": "DNI",
+  "numero_documento": "12345678",
+  "telefono_personal": "+51987654321",
+  "fecha_nacimiento": "2005-03-15",
+  "genero": "F",
+  "datosRolEspecifico": {
+    "condiciones_medicas": "Ninguna",
+    "seguro_medico": "Rimac",
+    "grupo_sanguineo": "O+",
+    "direccion": {
+      "direccion_completa": "Av. Universitaria 1234",
+      "distrito": "Los Olivos"
+    }
+  }
+}
+```
+
+<Info>
+  The `datosRolEspecifico` object creates the corresponding record in the `alumnos` extension table. If `condiciones_medicas` is omitted, it defaults to `'Ninguna conocida'`.
+</Info>
+
+---
+
+## Exporting the student directory
+
+From the main admin dashboard, click **Exportar Base** in the **Reporte Maestro** card. This calls:
+
+```http
+GET /usuarios/reporte/detallado
+```
+
+The response contains four arrays (`alumnos`, `inscripciones`, `pagos`, `deudas`) written into a styled Excel workbook with Gema blue headers. The file downloads immediately as `Reporte_Inteligencia_Gema_YYYY-MM-DD.xlsx`.
+
+---
+
+## Student history endpoints
+
+Use these endpoints when building integrations or reviewing individual student data outside the UI:
+
+```http
+# Payment history
+GET /pagos/alumno/:id
+
+# Attendance history
+GET /asistencias/alumno/:id
+
+# Attendance statistics
+GET /asistencias/alumno/:id/estadisticas
+
+# Accounts receivable history
+GET /cuentas-por-cobrar/historial/:id
+
+# Recovery session history
+GET /recuperaciones/alumno/:id
+
+# Injury reports
+GET /lesiones/alumno/:id
+```

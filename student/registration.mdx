@@ -1,0 +1,103 @@
+---
+title: "Account Registration & Login"
+description: "How to create a student account, log in for the first time, and recover your password."
+---
+
+## Creating your account
+
+Go to `/register` to open the student registration form. You must read and accept the Terms and Conditions before you can submit.
+
+<Steps>
+  <Step title="Open the registration page">
+    Navigate to `/register`. You will see the **Inscripción Alumno** form on the right panel.
+  </Step>
+  <Step title="Fill in your credentials">
+    Enter your email address and choose a password. These two fields are at the top of the form.
+
+    | Field | Description |
+    |---|---|
+    | `email` | Your email address — used as your login identifier |
+    | `password` | The password you will use to log in |
+  </Step>
+  <Step title="Fill in your personal data">
+    Complete the three groups of personal fields:
+
+    **Identity**
+
+    | Field | Notes |
+    |---|---|
+    | `nombres` | First name(s), required |
+    | `apellidos` | Last name(s), required |
+    | `genero` | `M` (Masculino), `F` (Femenino), or `O` (Otro) |
+
+    **Documentation**
+
+    | Field | Notes |
+    |---|---|
+    | `tipo_documento_id` | Document type (DNI, CE, etc.) — pre-filled from `/tipos-documento` |
+    | `numero_documento` | Document number |
+    | `fecha_nacimiento` | Date of birth |
+
+    **Contact**
+
+    | Field | Notes |
+    |---|---|
+    | `telefono_personal` | Your mobile number — digits only, max 9 digits |
+    | `contacto_emergencia` | Emergency contact phone number — digits only, max 9 digits |
+    | `parentesco` | Relationship: `familiar`, `pareja`, `amistad`, or `otro` |
+  </Step>
+  <Step title="Accept the Terms and Conditions">
+    Click **Ver Términos y Condiciones** to open the Compromiso de Participación modal. Scroll through all six clauses, then click **Aceptar y Continuar**. This unlocks the acceptance checkbox.
+
+    <Warning>
+      You cannot submit the form until you have opened and read the terms. The checkbox remains disabled until you close the modal.
+    </Warning>
+  </Step>
+  <Step title="Submit">
+    Click **Finalizar Inscripción**. The system calls `POST /usuarios/register` with your data plus `rol_id` set to the Alumno role.
+
+    On success, a toast notification shows your generated **username**. Write it down — you will need it to log in. You are then redirected to `/login`.
+  </Step>
+</Steps>
+
+<Info>
+  The emergency contact fields (`contacto_emergencia` and `parentesco`) are stored in the `alumnos` table under `datosRolEspecifico`, separate from your main user record.
+</Info>
+
+## Logging in
+
+<Steps>
+  <Step title="Go to /login">
+    Navigate to `/login`.
+  </Step>
+  <Step title="Enter your credentials">
+    - **Usuario** — enter your username (generated at registration) or your email address.
+    - **Contraseña** — your password. If your account was created by an administrator rather than through the web form, your default password is the same as your username.
+  </Step>
+  <Step title="Submit">
+    Click **Iniciar Sesión**. The system posts to `POST /auth/login` with `{ username, password }`. On success, your role cookies are set and you are redirected to `/dashboard/student`.
+  </Step>
+</Steps>
+
+<Tip>
+  If you registered through the web form, use the password you chose. If an administrator created your account manually, your initial password equals your username.
+</Tip>
+
+## Password recovery
+
+<Steps>
+  <Step title="Request a reset link">
+    On the login page, click **¿Olvidaste tu contraseña?** to go to `/forgot-password`. Enter your registered email address. The system calls `POST /auth/forgot-password` and sends a reset link to your inbox.
+  </Step>
+  <Step title="Set a new password">
+    Open the link from your email. It takes you to `/reset-password`. Enter and confirm your new password. The system calls `POST /auth/reset-password` to save the change.
+  </Step>
+</Steps>
+
+## Completing your email after first login
+
+If your account was created by an administrator and has no email on file, you may see a **CompletarEmailModal** prompt when you first log in. Enter a valid email address and confirm. The system calls `POST /auth/completar-email` to update your record.
+
+<Note>
+  Providing an email address enables password recovery. Without it, you will need to contact an administrator to reset your password.
+</Note>

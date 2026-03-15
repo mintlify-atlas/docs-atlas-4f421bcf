@@ -1,0 +1,87 @@
+---
+title: "Welcome to Academia Gema"
+description: "A complete volleyball academy management platform for administrators, students, and coordinators."
+---
+
+Academia Gema is a full-stack management platform designed specifically for volleyball academies. It provides everything you need to run day-to-day operations — from scheduling classes and enrolling students to tracking attendance, managing payments, and reporting injuries.
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Get up and running with Academia Gema in minutes
+  </Card>
+  <Card title="Student Guide" icon="user-graduate" href="/student/overview">
+    Learn how to enroll, pay, and manage your training
+  </Card>
+  <Card title="Admin Guide" icon="shield-halved" href="/admin/overview">
+    Manage your academy — students, schedules, payments, and more
+  </Card>
+  <Card title="Coordinator Guide" icon="whistle" href="/coordinator/overview">
+    Take attendance, manage your classes, and track student progress
+  </Card>
+</CardGroup>
+
+## What is Academia Gema?
+
+Academia Gema is a SaaS platform built for volleyball clubs and training academies. It brings together three distinct user experiences under one roof:
+
+- **Students** can browse the weekly schedule, enroll in classes, report payments, track attendance, and log injuries — all from a mobile-friendly dashboard.
+- **Coordinators** (teachers) take attendance during class sessions, manage their profile, and handle the cut-day workflow for billing cycles.
+- **Administrators** have full control over every aspect of the academy: locations, courts, training levels, class schedules, student and teacher management, payment validation, publications, benefits, and system settings.
+
+## Key features
+
+<CardGroup cols={3}>
+  <Card title="Role-based access" icon="lock">
+    Three distinct dashboards for Admins, Students, and Coordinators — each with exactly the right tools
+  </Card>
+  <Card title="Schedule management" icon="calendar">
+    Define weekly class schedules by location, court, level, and coordinator
+  </Card>
+  <Card title="Enrollment system" icon="clipboard-list">
+    Students enroll in specific class slots; capacity limits are enforced automatically
+  </Card>
+  <Card title="Payment tracking" icon="credit-card">
+    Students report payments with proof; admins validate and track accounts receivable
+  </Card>
+  <Card title="Attendance recording" icon="clipboard-check">
+    Mark students present, absent, late, or justified for every session
+  </Card>
+  <Card title="Multi-location support" icon="map-pin">
+    Manage multiple sedes (locations) and canchas (courts) from one platform
+  </Card>
+  <Card title="Injury & recovery" icon="heart-pulse">
+    Track student injuries and schedule makeup (recovery) sessions
+  </Card>
+  <Card title="Publications & news" icon="newspaper">
+    Admins publish announcements; students read them in their news feed
+  </Card>
+  <Card title="Excel exports" icon="file-excel">
+    Export detailed student and payment reports to Excel for offline analysis
+  </Card>
+</CardGroup>
+
+## User roles
+
+Academia Gema uses a role-based access system with three roles:
+
+| Role | Spanish name | Access |
+|------|-------------|--------|
+| Administrator | Administrador | Full platform access — all management features |
+| Student | Alumno | Student dashboard — enrollment, payments, attendance, injuries |
+| Coordinator | Coordinador | Teacher dashboard — attendance, profile, cut-day management |
+
+<Note>
+  Each role gets a dedicated dashboard layout optimized for their workflow. Unauthorized access attempts are redirected to the `/forbidden` page.
+</Note>
+
+## Platform architecture
+
+Academia Gema consists of a React frontend (this application) backed by a REST API and a PostgreSQL database. The frontend is built with:
+
+- **React 19** + **React Router v7** for routing and rendering
+- **Tailwind CSS v3** for styling
+- **Recharts** for analytics charts
+- **Framer Motion** for animations
+- **Vite** as the build tool
+
+Explore the [Technical Reference](/api/overview) for full API documentation and [Database Schema](/database/schema) for the data model.

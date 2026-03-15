@@ -1,0 +1,121 @@
+---
+title: "Plan Catalog Management"
+description: "Edit the plan catalog (catalogo) that drives public pricing and controls which plans are displayed on the Pricing page."
+---
+
+The **Plan Catalog** (`/dashboard/admin/catalog`) manages the `catalogo` table — the set of subscription plans that define how many classes per week a student receives and at what base price. These plans power both the internal billing logic and the public Pricing page.
+
+<Warning>
+  The catalog is **edit-only** from the admin panel. The "Create New Plan" button is intentionally not exposed in the UI because catalog entries are tied to internal billing logic. Contact a developer to add new catalog entries.
+</Warning>
+
+## Catalog fields
+
+| Field | Type | Description |
+|---|---|---|
+| `id` | integer | Primary key |
+| `nombre` | string | Plan display name — e.g., `Plan Básico 2x Semana` |
+| `codigo_interno` | string | Short internal code — e.g., `PLAN-2X` |
+| `precio_base` | decimal(10,2) | Base monthly price in PEN |
+| `cantidad_clases_semanal` | integer | Number of classes per week in this plan |
+| `es_vigente` | boolean | Whether the plan is visible on the public Pricing page |
+
+---
+
+## Viewing the catalog
+
+The catalog list loads from:
+
+```http
+GET /catalogo
+```
+
+Cards are displayed in a 4-column grid. Use the search bar to filter by `nombre` or `codigo_interno`. Use the **Vigencia** filter to show:
+
+| Filter | Behavior |
+|---|---|
+| `VIGENTE` (default) | Shows only plans where `es_vigente = true` |
+| `NO_VIGENTE` | Shows only plans where `es_vigente = false` |
+| `ALL` | Shows all plans regardless of vigencia |
+
+Each card shows the `codigo_interno` badge, plan name, weekly class frequency (`cantidad_clases_semanal` cl/sem), and the `precio_base` in green.
+
+---
+
+## Editing a plan
+
+<Steps>
+  <Step title="Click the edit icon">
+    Click the pencil icon in the top-right corner of a catalog card.
+  </Step>
+  <Step title="Update fields">
+    You can update `nombre`, `precio_base`, `cantidad_clases_semanal`, and `es_vigente`. The `codigo_interno` is usually fixed once set.
+  </Step>
+  <Step title="Save">
+    The form submits to:
+
+    ```http
+    PUT /catalogo/:id
+    Content-Type: application/json
+
+    {
+      "nombre": "Plan Básico 2x Semana",
+      "precio_base": 160.00,
+      "cantidad_clases_semanal": 2,
+      "es_vigente": true
+    }
+    ```
+  </Step>
+</Steps>
+
+---
+
+## Vigentes vs activos
+
+The catalog has two conceptual states:
+
+| State | Field | Endpoint | Used for |
+|---|---|---|---|
+| **Vigente** | `es_vigente = true` | `GET /catalogo/vigentes` | Public Pricing page display |
+| **Activo** | General availability | `GET /catalogo/activos` | Internal system use |
+
+The public Pricing page calls `GET /catalogo/vigentes` and displays **up to 5 plans**. If more than 5 plans have `es_vigente = true`, only the first 5 returned by the API are shown.
+
+<Tip>
+  To hide a plan from the public Pricing page without deleting it, set `es_vigente = false`. The plan remains available internally for historical billing references.
+</Tip>
+
+---
+
+## How plans relate to enrollment and billing
+
+```
+Student enrolls in a schedule (horario)
+  → horario has a nivel_id
+  → nivel has a precio_mensual
+  → billing engine creates cuentas_por_cobrar based on the nivel's price
+  → the catalogo plan is shown publicly to explain what is included
+```
+
+The `cantidad_clases_semanal` on a catalog entry is informational — it describes the expected weekly frequency for that plan tier. The actual classes attended are tracked through the `inscripciones` and `registros_asistencia` tables.
+
+---
+
+## API reference
+
+```http
+# All catalog entries (admin)
+GET /catalogo
+
+# Public pricing plans (vigentes only)
+GET /catalogo/vigentes
+
+# Active catalog entries
+GET /catalogo/activos
+
+# Get single entry
+GET /catalogo/:id
+
+# Update a plan
+PUT /catalogo/:id
+```

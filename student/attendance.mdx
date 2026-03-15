@@ -1,0 +1,66 @@
+---
+title: "Attendance"
+description: "How to read your attendance record, understand attendance statuses, and interpret your statistics."
+---
+
+Attendance is recorded by your coordinator at each class session. You cannot mark your own attendance — only coordinators and administrators can do so.
+
+## Where to view your attendance
+
+Your attendance records appear in two places:
+
+- **Dashboard home** (`/dashboard/student`) — the Schedule grid in the main area shows all your attendance records for the selected month and year. Toggle the month filter and cycle selector to browse historical data.
+- **Stats bar** — the two cards above the schedule grid show summary statistics fetched from `GET /asistencias/alumno/:id/estadisticas`.
+
+## Attendance statuses
+
+Each attendance record in `registros_asistencia` has an `estado` field with one of four values:
+
+| Estado | Meaning |
+|---|---|
+| `PRESENTE` | You attended the session |
+| `AUSENTE` | You were absent without justification |
+| `TARDE` | You arrived late |
+| `JUSTIFICADO` | Your absence was officially excused |
+
+## Attendance statistics
+
+The stats bar on the dashboard home shows two metrics derived from `GET /asistencias/alumno/:id/estadisticas`:
+
+<CardGroup cols={2}>
+  <Card title="Asistencia Real" icon="calendar-check">
+    Your attendance percentage. The value is `porcentaje_asistencia_real` from the statistics endpoint. Displayed in **red** when below 50%.
+  </Card>
+  <Card title="Faltas Totales" icon="history">
+    The total number of missed sessions (`detalle.FALTA.cantidad`). These are the sessions eligible for makeup through the Recovery system.
+  </Card>
+</CardGroup>
+
+## How attendance affects your account
+
+<Accordion title="Recovery eligibility">
+  Absences (`AUSENTE`) generate recovery tickets that you can use to schedule makeup sessions. See the [Recoveries](/student/recoveries) guide for how to use them.
+
+  The number of normal recovery sessions you can use per cycle is limited based on your weekly training frequency:
+  - Training 2–3 times per week → up to 2 makeup sessions
+  - Training 4 or more times per week → up to 4 makeup sessions
+
+  Absences caused by an approved injury have no recovery limit.
+</Accordion>
+
+<Accordion title="Standing and enrollment">
+  Your attendance percentage does not directly block enrollment. However, outstanding debts (which can arise from repeated absences) do block new enrollment. Maintaining a good attendance record helps you stay in good standing.
+</Accordion>
+
+<Accordion title="Justified absences">
+  A `JUSTIFICADO` status is set by a coordinator or administrator. If you believe an absence was due to a valid reason (illness, injury, academy-cancelled session), contact your coordinator to request justification.
+</Accordion>
+
+## Filtering your schedule on the dashboard
+
+In the schedule grid on the dashboard home, use the two filter controls to narrow your view:
+
+- **Month filter** — select a specific month or choose **TODOS LOS MESES** to see all records.
+- **Cycle selector** — shows the current year by default. The selected year is displayed as **Ciclo YYYY**.
+
+Recovery sessions that appear in your attendance history are marked with `isRecuperacion: true` and are merged with your regular attendance records in the same grid.
